@@ -48,3 +48,18 @@ build/
 *.elf
 
 tools/dependency/web/data.js
+
+# Archivos personales
+git-pull.bat
+git-push.bat
+
+# Python
+__pycache__/
+*.py[cod]
+
+# VS Code
+.vscode/
+
+# Entornos virtuales
+.env
+venv/
