@@ -37,43 +37,40 @@ static ControllerFcns controllerFunctions[] = {
 
 
 void controllerInit(ControllerType controller) {
-  if (controller < 0 || controller >= ControllerType_COUNT) {
-    return;
-  }
+    // 1. Validation initiale (on le mantient)
+    if (controller < 0 || controller >= ControllerType_COUNT) {
+        return;
+    }
 
-  currentController = controller;
+    // 2. Si un correcteur est choisi (manuale)
+    if (controller != ControllerTypeAutoSelect) {
+        currentController = controller;
+    } 
+    // 3. Si non, utiliser app-config.txt/Kconfig
+    else {
+        #if defined(CONFIG_CONTROLLER_PID)
+            currentController = ControllerTypePID;
+        #elif defined(CONFIG_CONTROLLER_INDI)
+            currentController = ControllerTypeINDI;
+        #elif defined(CONFIG_CONTROLLER_MELLINGER)
+            currentController = ControllerTypeMellinger;
+        #elif defined(CONFIG_CONTROLLER_BRESCIANINI)
+            currentController = ControllerTypeBrescianini;
+        #elif defined(CONFIG_CONTROLLER_LEE)
+            currentController = ControllerTypeLee;
+        #elif defined(CONFIG_CONTROLLER_OOT)
+            currentController = ControllerTypeOot;
+        #else
+            // 4. Si rien n'est défini, utiliser le correcteur par défaut
+            DEBUG_PRINT("No controller defined, using default\n");
+            currentController = DEFAULT_CONTROLLER;
+        #endif
+    }
 
-  if (ControllerTypeAutoSelect == currentController) {
-    currentController = DEFAULT_CONTROLLER;
-  }
-
-  #if defined(CONFIG_CONTROLLER_PID)
-    #define CONTROLLER ControllerTypePID
-  #elif defined(CONFIG_CONTROLLER_INDI)
-    #define CONTROLLER ControllerTypeINDI
-  #elif defined(CONFIG_CONTROLLER_MELLINGER)
-    #define CONTROLLER ControllerTypeMellinger
-  #elif defined(CONFIG_CONTROLLER_BRESCIANINI)
-    #define CONTROLLER ControllerTypeBrescianini
-  #elif defined(CONFIG_CONTROLLER_LEE)
-    #define CONTROLLER ControllerTypeLee
-  #elif defined(CONFIG_CONTROLLER_OOT)
-    #define CONTROLLER ControllerTypeOot
-  #else
-    #define CONTROLLER ControllerTypeAutoSelect
-  #endif
-
-  ControllerType forcedController = CONTROLLER;
-  if (forcedController != ControllerTypeAutoSelect) {
-    DEBUG_PRINT("Controller type forced\n");
-    currentController = forcedController;
-  }
-
-  initController();
-
-  DEBUG_PRINT("Using %s (%d) controller\n", controllerGetName(), currentController);
+    // 5. Initialisation
+    initController();
+    DEBUG_PRINT("Using %s (%d) controller\n", controllerGetName(), currentController);
 }
-
 ControllerType controllerGetType(void) {
   return currentController;
 }

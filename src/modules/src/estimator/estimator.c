@@ -106,40 +106,41 @@ void stateEstimatorInit(StateEstimatorType estimator) {
 }
 
 void stateEstimatorSwitchTo(StateEstimatorType estimator) {
-  if (estimator < 0 || estimator >= StateEstimatorType_COUNT) {
-    return;
-  }
+    // 1. Validation initiale (on le mantient)
+    if (estimator < 0 || estimator >= StateEstimatorType_COUNT) {
+        return;
+    }
 
-  StateEstimatorType newEstimator = estimator;
+    StateEstimatorType newEstimator = estimator;
 
-  if (StateEstimatorTypeAutoSelect == newEstimator) {
-    newEstimator = DEFAULT_ESTIMATOR;
-  }
+    // 2. Si un estimateur est choisi (manuale)
+    if (estimator != StateEstimatorTypeAutoSelect) {
+        newEstimator = estimator;
+    } 
+    // 3. Si non, utiliser app-config.txt/Kconfig
+    else {
+        #if defined(CONFIG_ESTIMATOR_KALMAN)
+            newEstimator = StateEstimatorTypeKalman;
+        #elif defined(CONFIG_ESTIMATOR_UKF)
+            newEstimator = StateEstimatorTypeUkf;
+        #elif defined(CONFIG_ESTIMATOR_COMPLEMENTARY)
+            newEstimator = StateEstimatorTypeComplementary;
+        #elif defined(CONFIG_ESTIMATOR_OOT)
+            newEstimator = StateEstimatorTypeOutOfTree;
+        #else
+            // 4. Si rien n'est défini, utiliser le correcteur par défaut
+            newEstimator = DEFAULT_ESTIMATOR;
+        #endif
+    }
 
-  #if defined(CONFIG_ESTIMATOR_KALMAN)
-    #define ESTIMATOR StateEstimatorTypeKalman
-  #elif defined(CONFIG_ESTIMATOR_UKF)
-    #define ESTIMATOR StateEstimatorTypeUkf
-  #elif defined(CONFIG_ESTIMATOR_COMPLEMENTARY)
-    #define ESTIMATOR StateEstimatorTypeComplementary
-  #else
-    #define ESTIMATOR StateEstimatorTypeAutoSelect
-  #endif
+    // 5. Initialisation
+    initEstimator(newEstimator);
+    StateEstimatorType previousEstimator = currentEstimator;
+    currentEstimator = newEstimator;
+    deinitEstimator(previousEstimator);
 
-  StateEstimatorType forcedEstimator = ESTIMATOR;
-  if (forcedEstimator != StateEstimatorTypeAutoSelect) {
-    DEBUG_PRINT("Estimator type forced\n");
-    newEstimator = forcedEstimator;
-  }
-
-  initEstimator(newEstimator);
-  StateEstimatorType previousEstimator = currentEstimator;
-  currentEstimator = newEstimator;
-  deinitEstimator(previousEstimator);
-
-  DEBUG_PRINT("Using %s (%d) estimator\n", stateEstimatorGetName(), currentEstimator);
+    DEBUG_PRINT("Using %s (%d) estimator\n", stateEstimatorGetName(), currentEstimator);
 }
-
 StateEstimatorType stateEstimatorGetType(void) {
   return currentEstimator;
 }
