@@ -275,7 +275,7 @@ static void kalmanTask(void* parameters) {
   }
 }
 
-void estimatorKalman(state_t *state, const stabilizerStep_t stabilizerStep) {
+void estimatorKalman_oot(state_t *state, const stabilizerStep_t stabilizerStep) {
   // This function is called from the stabilizer loop. It is important that this call returns
   // as quickly as possible. The dataMutex must only be locked short periods by the task.
   xSemaphoreTake(dataMutex, portMAX_DELAY);
@@ -310,7 +310,9 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithPosition(&coreData, &m.data.position);
         break;
       case MeasurementTypePose:
-        kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
+        if(lighthouseUseCorrection()){
+          kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
+        }
         break;
       case MeasurementTypeDistance:
         if(robustTwr){
@@ -334,7 +336,9 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithYawError(&coreData, &m.data.yawError);
         break;
       case MeasurementTypeSweepAngle:
-        kalmanCoreUpdateWithSweepAngles(&coreData, &m.data.sweepAngle, nowMs, &sweepOutlierFilterState);
+        if(lighthouseUseCorrection()){
+          kalmanCoreUpdateWithSweepAngles(&coreData, &m.data.sweepAngle, nowMs, &sweepOutlierFilterState);
+        }
         break;
       case MeasurementTypeGyroscope:
         axis3fSubSamplerAccumulate(&gyroSubSampler, &m.data.gyroscope.gyro);
