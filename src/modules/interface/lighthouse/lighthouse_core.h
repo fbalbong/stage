@@ -77,3 +77,10 @@ typedef enum {
 void lighthouseCoreSetLeds(lighthouseCoreLedState_t red, lighthouseCoreLedState_t orange, lighthouseCoreLedState_t green);
 
 void lighthouseCoreLedTimer();
+
+/**
+ * @brief Verifica que el ligthouse entra como correccion
+ *
+ * @return Verdadero si se usa y falso si no se usa
+ */
+bool lighthouseUseCorrection(void);

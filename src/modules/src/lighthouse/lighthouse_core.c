@@ -138,6 +138,10 @@ static pulseProcessorProcessPulse_t pulseProcessorProcessPulse = pulseProcessorV
 
 static bool deckIsFlashed = false;
 
+// Variable para indicar si está activada la corrección del lighthouse
+static bool useLighthouseCorrection = true;
+
+
 static void modifyBit(uint16_t *bitmap, const int index, const bool value) {
   const uint16_t mask = (1 << index);
 
@@ -606,6 +610,14 @@ static uint8_t pulseProcessorAnglesQualityLogger(uint32_t timestamp, void* ignor
 static logByFunction_t pulseProcessorAnglesQualityLoggerDef = {.acquireUInt8 = pulseProcessorAnglesQualityLogger, .data = 0};
 
 /**
+ * Funcion por la cara
+ */
+bool lighthouseUseCorrection(void) {
+  return useLighthouseCorrection;
+}
+
+
+/**
  * Log group for the lighthouse positioning system
  */
 LOG_GROUP_START(lighthouse)
@@ -936,5 +948,11 @@ PARAM_ADD_CORE(PARAM_UINT8, systemType, &systemType)
  * The lowest bit maps to base station channel 1 and the highest to channel 16.
  */
 PARAM_ADD_CORE(PARAM_UINT16 | PARAM_RONLY, bsAvailable, &baseStationAvailabledMap)
+
+/**
+ * @brief Uso o no uso el lighthouse para la corrección en kalman
+ */
+PARAM_ADD_CORE(PARAM_UINT8, useCorrection, &useLighthouseCorrection)
+
 
 PARAM_GROUP_STOP(lighthouse)

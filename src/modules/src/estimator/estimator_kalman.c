@@ -310,7 +310,9 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithPosition(&coreData, &m.data.position);
         break;
       case MeasurementTypePose:
-        kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
+        if(lighthouseUseCorrection()){
+          kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
+        }
         break;
       case MeasurementTypeDistance:
         if(robustTwr){
@@ -334,7 +336,9 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithYawError(&coreData, &m.data.yawError);
         break;
       case MeasurementTypeSweepAngle:
-        kalmanCoreUpdateWithSweepAngles(&coreData, &m.data.sweepAngle, nowMs, &sweepOutlierFilterState);
+        if(lighthouseUseCorrection()){
+          kalmanCoreUpdateWithSweepAngles(&coreData, &m.data.sweepAngle, nowMs, &sweepOutlierFilterState);
+        }
         break;
       case MeasurementTypeGyroscope:
         axis3fSubSamplerAccumulate(&gyroSubSampler, &m.data.gyroscope.gyro);
