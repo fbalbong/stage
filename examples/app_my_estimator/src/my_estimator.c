@@ -74,7 +74,7 @@ void estimatorOutOfTree(state_t *state, const stabilizerStep_t stabilizerStep) {
   // This function is called from the stabilizer loop. It is important that this call returns
   // as quickly as possible. The dataMutex must only be locked short periods by the task.
 
-  DEBUG_PRINT("Out of tree estimator update\n");
+  // DEBUG_PRINT("Out of tree estimator update\n");
 
   // Call the Kalman estimator instead in this example to make it possible to fly
   estimatorKalman(state, stabilizerStep);
