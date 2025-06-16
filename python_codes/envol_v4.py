@@ -13,7 +13,6 @@ uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 kalman_data = {'time': [], 'x': [], 'y': [], 'z': []}
 lighthouse_data = {'x': [], 'y': [], 'z': []}
 start_time = None
-phase_times = []
 flowdeck_active = [False]
 multiranger_active = [False]
 lighthouse_status = [0]
@@ -47,15 +46,12 @@ def battery_callback(timestamp, data, logconf):
     print(f"🔋 Batería: {voltage:.2f} V")
 
 # === Funciones de vuelo y setup ===
-def send_velocity(cf, vx, vy, vz, duration):
-    dt = 0.01
+def send_position(cf, x, y, z, duration):
+    dt = 0.1
     steps = int(duration / dt)
-    t0 = time.time()
     for _ in range(steps):
-        cf.commander.send_velocity_world_setpoint(vx, vy, vz, 0)
+        cf.commander.send_position_setpoint(x, y, z, 0)
         time.sleep(dt)
-    t1 = time.time()
-    phase_times.append((t0 - phase_times[0][0] if phase_times else 0, duration, vx, vy, vz))
 
 def arm_dron():
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
@@ -77,25 +73,30 @@ def check_decks_attached(cf):
 
 # === MAIN ===
 if __name__ == '__main__':
-    # Preguntar por consola si se quiere usar la corrección Lighthouse
     use_correction = input("¿Quieres usar lighthouse.useCorrection? (1 = sí, 0 = no): ")
     while use_correction not in ['0', '1']:
         use_correction = input("Entrada no válida. Escribe 1 (sí) o 0 (no): ")
     use_correction = int(use_correction)
 
+    lh_method = input("¿Qué método de lighthouse quieres usar? (0 = Crossing Beams, 1 = Sweep Angle): ")
+    while lh_method not in ['0', '1']:
+        lh_method = input("Entrada no válida. Escribe 0 (Crossing Beams) o 1 (Sweep Angle): ")
+    lh_method = int(lh_method)
+    
     cflib.crtp.init_drivers()
     arm_dron()
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         scf.cf.param.set_value('stabilizer.estimator', '2')
         scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
+        scf.cf.param.set_value('lighthouse.method', str(lh_method))
         reset_estimator(scf.cf)
 
         decks = check_decks_attached(scf.cf)
         flowdeck_active[0] = decks['flow2'] != 0
         multiranger_active[0] = decks['multiranger'] != 0
 
-        # Batería
+        # Logs
         logconf_bat = LogConfig(name='Battery', period_in_ms=500)
         logconf_bat.add_variable('pm.vbat', 'float')
         scf.cf.log.add_config(logconf_bat)
@@ -104,7 +105,6 @@ if __name__ == '__main__':
         time.sleep(1)
         logconf_bat.stop()
 
-        # Kalman
         logconf_kalman = LogConfig(name='Kalman', period_in_ms=100)
         for var in ['stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z']:
             logconf_kalman.add_variable(var, 'float')
@@ -112,7 +112,6 @@ if __name__ == '__main__':
         logconf_kalman.data_received_cb.add_callback(kalman_callback)
         logconf_kalman.start()
 
-        # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=100)
         for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
             logconf_lh.add_variable(var, 'float')
@@ -120,27 +119,43 @@ if __name__ == '__main__':
         logconf_lh.data_received_cb.add_callback(lighthouse_callback)
         logconf_lh.start()
 
-        # Lighthouse status
         logconf_lh_status = LogConfig(name='LighthouseStatus', period_in_ms=500)
         logconf_lh_status.add_variable('lighthouse.status', 'uint8_t')
         scf.cf.log.add_config(logconf_lh_status)
         logconf_lh_status.data_received_cb.add_callback(lighthouse_status_callback)
         logconf_lh_status.start()
 
-        # Range (Flowdeck)
         logconf_range = LogConfig(name='Range', period_in_ms=100)
         logconf_range.add_variable('range.zrange', 'float')
         scf.cf.log.add_config(logconf_range)
         logconf_range.data_received_cb.add_callback(range_callback)
         logconf_range.start()
 
-        # Vuelo
-        send_velocity(scf.cf, 0, 0, 0.25, 2)
-        send_velocity(scf.cf, 0, 0, 0.1, 1)
-        send_velocity(scf.cf, 0, 0, 0.25, 2)
-        send_velocity(scf.cf, 0.25, 0, 0, 2)
-        send_velocity(scf.cf, 0, 0.25, 0, 2)
-        send_velocity(scf.cf, 0, 0, 0, 1)
+        # Trajectoire souhaitée
+        trajectory = [
+            (0, 0, 0.5, 2),
+            (0.5, 0, 0.5, 2),
+            (0.5, 0.5, 0.5, 2),
+            (0, 0.5, 0.5, 2),
+            (0, 0, 0.5, 2),
+            (0, 0, 0, 1)
+        ]
+
+        # Crear referencias
+        x_ref, y_ref, z_ref, t_ref = [], [], [], []
+        t = 0
+        for x, y, z, duration in trajectory:
+            steps = int(duration / 0.1)
+            for _ in range(steps):
+                x_ref.append(x)
+                y_ref.append(y)
+                z_ref.append(z)
+                t_ref.append(t)
+                t += 0.1
+
+        # Ejecutar vuelo
+        for x, y, z, duration in trajectory:
+            send_position(scf.cf, x, y, z, duration)
 
         logconf_kalman.stop()
         logconf_lh.stop()
@@ -164,6 +179,12 @@ if __name__ == '__main__':
     else:
         print("❌ Multi-ranger deck no detectado")
 
+    # Alinear longitudes
+    n = len(kalman_data['x'])
+    t_ref = t_ref[:n]
+    x_ref = x_ref[:n]
+    y_ref = y_ref[:n]
+    z_ref = z_ref[:n]
 
     # Gráficas
     plt.figure(figsize=(12, 8))
