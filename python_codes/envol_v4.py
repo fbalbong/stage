@@ -154,8 +154,15 @@ if __name__ == '__main__':
                 t += 0.1
 
         # Ejecutar vuelo
+        # scf.cf.param.set_value('commander.enHighLevel', '1')  # Activar comandos de alto nivel
+        # commander = scf.cf.high_level_commander
+
+        # commander.takeoff(0.5, 2.0)
         for x, y, z, duration in trajectory:
             send_position(scf.cf, x, y, z, duration)
+        # commander.land(0, 2.0)
+    
+
 
         logconf_kalman.stop()
         logconf_lh.stop()

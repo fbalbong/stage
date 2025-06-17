@@ -2,7 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Leer el archivo CSV
-df = pd.read_csv("comparacion_sin_ligthouse.csv")
+# df = pd.read_csv("comparacion_sin_ligthouse.csv")
+df = pd.read_csv("sin_lighthouse_deck.csv")
 
 # Asumimos que cada fila corresponde a un instante temporal uniforme
 t = range(len(df))

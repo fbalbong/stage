@@ -307,8 +307,10 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         }
         break;
       case MeasurementTypePosition:
-        kalmanCoreUpdateWithPosition(&coreData, &m.data.position);
-        break;
+        if(lighthouseUseCorrection()){
+          kalmanCoreUpdateWithPosition(&coreData, &m.data.position);
+        }  
+          break;
       case MeasurementTypePose:
         if(lighthouseUseCorrection()){
           kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
