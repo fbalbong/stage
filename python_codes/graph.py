@@ -4,7 +4,11 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation
 
 # === Leer CSV ===
+<<<<<<< HEAD
 df = pd.read_csv("vuelo_datos_1_0.csv")
+=======
+df = pd.read_csv("vuelo_datos_0_0.csv")
+>>>>>>> 3f34ef675855a51bcca1f15b590466a68e1acb34
 t = df['time']
 
 # === Gráficas 2D Kalman vs Lighthouse ===
