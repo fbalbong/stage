@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
@@ -194,36 +195,18 @@ if __name__ == '__main__':
     z_ref = z_ref[:n]
 
     # Gráficas
-    plt.figure(figsize=(12, 8))
+    import pandas as pd
 
-    plt.subplot(3, 1, 1)
-    plt.plot(t_ref, kalman_data['x'], label='x estimé')
-    plt.plot(t_ref, x_ref, '--', label='x souhaité')
-    if len(lighthouse_data['x']) == len(t_ref):
-        plt.plot(t_ref, lighthouse_data['x'], ':', label='x lighthouse')
-    plt.ylabel('X (m)')
-    plt.grid()
-    plt.legend()
+    # Exportar datos a CSV
+    df = pd.DataFrame({
+        'time': kalman_data['time'],
+        'x_kalman': kalman_data['x'],
+        'y_kalman': kalman_data['y'],
+        'z_kalman': kalman_data['z'],
+        'x_lh': lighthouse_data['x'],
+        'y_lh': lighthouse_data['y'],
+        'z_lh': lighthouse_data['z']
+    })
+    df.to_csv("vuelo_datos.csv", index=False)
+    print("Datos exportados")
 
-    plt.subplot(3, 1, 2)
-    plt.plot(t_ref, kalman_data['y'], label='y estimé')
-    plt.plot(t_ref, y_ref, '--', label='y souhaité')
-    if len(lighthouse_data['y']) == len(t_ref):
-        plt.plot(t_ref, lighthouse_data['y'], ':', label='y lighthouse')
-    plt.ylabel('Y (m)')
-    plt.grid()
-    plt.legend()
-
-    plt.subplot(3, 1, 3)
-    plt.plot(t_ref, kalman_data['z'], label='z estimé')
-    plt.plot(t_ref, z_ref, '--', label='z souhaité')
-    if len(lighthouse_data['z']) == len(t_ref):
-        plt.plot(t_ref, lighthouse_data['z'], ':', label='z lighthouse')
-    plt.xlabel('Temps (s)')
-    plt.ylabel('Z (m)')
-    plt.grid()
-    plt.legend()
-
-    plt.suptitle('Comparaison Kalman vs Lighthouse vs Trajectoire Souhaitée')
-    plt.tight_layout()
-    plt.show()
