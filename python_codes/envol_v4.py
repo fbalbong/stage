@@ -11,7 +11,10 @@ from cflib.utils import uri_helper
 
 uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
-kalman_data = {'time': [], 'x': [], 'y': [], 'z': []}
+kalman_data = {
+    'time': [], 'x': [], 'y': [], 'z': [],
+    'roll': [], 'pitch': [], 'yaw': []
+}
 lighthouse_data = {'x': [], 'y': [], 'z': []}
 start_time = None
 flowdeck_active = [False]
@@ -28,6 +31,9 @@ def kalman_callback(timestamp, data, logconf):
     kalman_data['x'].append(data['stateEstimate.x'])
     kalman_data['y'].append(data['stateEstimate.y'])
     kalman_data['z'].append(data['stateEstimate.z'])
+    kalman_data['roll'].append(data['stateEstimate.roll'])
+    kalman_data['pitch'].append(data['stateEstimate.pitch'])
+    kalman_data['yaw'].append(data['stateEstimate.yaw'])
 
 def lighthouse_callback(timestamp, data, logconf):
     lighthouse_data['x'].append(data['lighthouse.x'])
@@ -37,6 +43,7 @@ def lighthouse_callback(timestamp, data, logconf):
 def lighthouse_status_callback(timestamp, data, logconf):
     lighthouse_status[0] = data['lighthouse.status']
 
+# Creo que puedo quitar este def range_callback, probar
 def range_callback(timestamp, data, logconf):
     z = data['range.zrange']
     if 0.05 < z < 3.0:
@@ -48,7 +55,7 @@ def battery_callback(timestamp, data, logconf):
 
 # === Funciones de vuelo y setup ===
 def send_position(cf, x, y, z, duration):
-    dt = 0.1
+    dt = 0.1 
     steps = int(duration / dt)
     for _ in range(steps):
         cf.commander.send_position_setpoint(x, y, z, 0)
@@ -106,14 +113,17 @@ if __name__ == '__main__':
         time.sleep(1)
         logconf_bat.stop()
 
-        logconf_kalman = LogConfig(name='Kalman', period_in_ms=100)
-        for var in ['stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z']:
+        logconf_kalman = LogConfig(name='Kalman', period_in_ms=20)
+        for var in [
+            'stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
+            'stateEstimate.roll', 'stateEstimate.pitch', 'stateEstimate.yaw'
+        ]:
             logconf_kalman.add_variable(var, 'float')
         scf.cf.log.add_config(logconf_kalman)
         logconf_kalman.data_received_cb.add_callback(kalman_callback)
         logconf_kalman.start()
 
-        logconf_lh = LogConfig(name='Lighthouse', period_in_ms=100)
+        logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
         for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
             logconf_lh.add_variable(var, 'float')
         scf.cf.log.add_config(logconf_lh)
@@ -126,7 +136,7 @@ if __name__ == '__main__':
         logconf_lh_status.data_received_cb.add_callback(lighthouse_status_callback)
         logconf_lh_status.start()
 
-        logconf_range = LogConfig(name='Range', period_in_ms=100)
+        logconf_range = LogConfig(name='Range', period_in_ms=20)
         logconf_range.add_variable('range.zrange', 'float')
         scf.cf.log.add_config(logconf_range)
         logconf_range.data_received_cb.add_callback(range_callback)
@@ -142,28 +152,9 @@ if __name__ == '__main__':
             (0, 0, 0, 1)
         ]
 
-        # Crear referencias
-        x_ref, y_ref, z_ref, t_ref = [], [], [], []
-        t = 0
-        for x, y, z, duration in trajectory:
-            steps = int(duration / 0.1)
-            for _ in range(steps):
-                x_ref.append(x)
-                y_ref.append(y)
-                z_ref.append(z)
-                t_ref.append(t)
-                t += 0.1
-
         # Ejecutar vuelo
-        # scf.cf.param.set_value('commander.enHighLevel', '1')  # Activar comandos de alto nivel
-        # commander = scf.cf.high_level_commander
-
-        # commander.takeoff(0.5, 2.0)
         for x, y, z, duration in trajectory:
             send_position(scf.cf, x, y, z, duration)
-        # commander.land(0, 2.0)
-    
-
 
         logconf_kalman.stop()
         logconf_lh.stop()
@@ -187,17 +178,7 @@ if __name__ == '__main__':
     else:
         print("❌ Multi-ranger deck no detectado")
 
-    # Alinear longitudes
-    n = len(kalman_data['x'])
-    t_ref = t_ref[:n]
-    x_ref = x_ref[:n]
-    y_ref = y_ref[:n]
-    z_ref = z_ref[:n]
-
-    # Gráficas
-    import pandas as pd
-
-    # Exportar datos a CSV
+    # Exportar a CSV
     df = pd.DataFrame({
         'time': kalman_data['time'],
         'x_kalman': kalman_data['x'],
@@ -205,8 +186,10 @@ if __name__ == '__main__':
         'z_kalman': kalman_data['z'],
         'x_lh': lighthouse_data['x'],
         'y_lh': lighthouse_data['y'],
-        'z_lh': lighthouse_data['z']
+        'z_lh': lighthouse_data['z'],
+        'roll': kalman_data['roll'],
+        'pitch': kalman_data['pitch'],
+        'yaw': kalman_data['yaw']
     })
     df.to_csv("vuelo_datos.csv", index=False)
-    print("Datos exportados")
-
+    print("Datos exportados a vuelo_datos.csv")
