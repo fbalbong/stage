@@ -193,3 +193,4 @@ if __name__ == '__main__':
     })
     df.to_csv("vuelo_datos.csv", index=False)
     print("Datos exportados a vuelo_datos.csv")
+# me cago en todo
