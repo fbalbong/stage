@@ -312,9 +312,7 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         }  
           break;
       case MeasurementTypePose:
-        if(lighthouseUseCorrection()){
           kalmanCoreUpdateWithPose(&coreData, &m.data.pose);
-        }
         break;
       case MeasurementTypeDistance:
         if(robustTwr){

@@ -20,6 +20,10 @@ start_time = None
 flowdeck_active = [False]
 multiranger_active = [False]
 lighthouse_status = [0]
+extra_data = {
+    'motor.m1': [], 'motor.m2': [], 'motor.m3': [], 'motor.m4': [],
+    'stabilizer.thrust': [], 'stabilizer.roll': [], 'stabilizer.pitch': [], 'stabilizer.yaw': []
+}
 
 # === Callbacks ===
 def kalman_callback(timestamp, data, logconf):
@@ -42,6 +46,16 @@ def lighthouse_callback(timestamp, data, logconf):
 
 def lighthouse_status_callback(timestamp, data, logconf):
     lighthouse_status[0] = data['lighthouse.status']
+
+def extra_callback(timestamp, data, logconf):
+    extra_data['motor.m1'].append(data['motor.m1'])
+    extra_data['motor.m2'].append(data['motor.m2'])
+    extra_data['motor.m3'].append(data['motor.m3'])
+    extra_data['motor.m4'].append(data['motor.m4'])
+    extra_data['stabilizer.thrust'].append(data['stabilizer.thrust'])
+    extra_data['stabilizer.roll'].append(data['stabilizer.roll'])
+    extra_data['stabilizer.pitch'].append(data['stabilizer.pitch'])
+    extra_data['stabilizer.yaw'].append(data['stabilizer.yaw'])
 
 # Creo que puedo quitar este def range_callback, probar
 def range_callback(timestamp, data, logconf):
@@ -81,14 +95,14 @@ def check_decks_attached(cf):
 
 # === MAIN ===
 if __name__ == '__main__':
-    use_correction = input("¿Quieres usar lighthouse.useCorrection? (1 = sí, 0 = no): ")
+    use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
     while use_correction not in ['0', '1']:
-        use_correction = input("Entrada no válida. Escribe 1 (sí) o 0 (no): ")
+        use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_correction = int(use_correction)
 
-    lh_method = input("¿Qué método de lighthouse quieres usar? (0 = Crossing Beams, 1 = Sweep Angle): ")
+    lh_method = input("¿Quel method de lighthouse vous voulez utiliser? (0 = Crossing Beams, 1 = Sweep Angle): ")
     while lh_method not in ['0', '1']:
-        lh_method = input("Entrada no válida. Escribe 0 (Crossing Beams) o 1 (Sweep Angle): ")
+        lh_method = input("Entrée non validée. Écrivez 0 (Crossing Beams) o 1 (Sweep Angle): ")
     lh_method = int(lh_method)
     
     cflib.crtp.init_drivers()
@@ -113,6 +127,7 @@ if __name__ == '__main__':
         time.sleep(1)
         logconf_bat.stop()
 
+        # Kalman
         logconf_kalman = LogConfig(name='Kalman', period_in_ms=20)
         for var in [
             'stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
@@ -123,6 +138,7 @@ if __name__ == '__main__':
         logconf_kalman.data_received_cb.add_callback(kalman_callback)
         logconf_kalman.start()
 
+        # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
         for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
             logconf_lh.add_variable(var, 'float')
@@ -136,11 +152,24 @@ if __name__ == '__main__':
         logconf_lh_status.data_received_cb.add_callback(lighthouse_status_callback)
         logconf_lh_status.start()
 
+        # Flowdeck v2
         logconf_range = LogConfig(name='Range', period_in_ms=20)
         logconf_range.add_variable('range.zrange', 'float')
         scf.cf.log.add_config(logconf_range)
         logconf_range.data_received_cb.add_callback(range_callback)
         logconf_range.start()
+
+        # Jules
+        lc_ex = LogConfig(name='Extra', period_in_ms=20)
+        for var in [
+            'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',
+            'stabilizer.thrust', 'stabilizer.roll',
+            'stabilizer.pitch', 'stabilizer.yaw'
+        ]:
+            lc_ex.add_variable(var, 'float')
+        scf.cf.log.add_config(lc_ex)
+        lc_ex.data_received_cb.add_callback(extra_callback)
+        lc_ex.start()
 
         # Trajectoire souhaitée
         trajectory = [
@@ -164,19 +193,19 @@ if __name__ == '__main__':
 
     # Diagnóstico
     if lighthouse_status[0] == 2:
-        print("✅ Lighthouse se está usando como fuente de estimación (status = 2)")
+        print("✅ Lighthouse est utilisé comme une partie d'estimation (status = 2)")
     else:
-        print(f"❌ Lighthouse no se está usando como fuente de estimación (status = {lighthouse_status[0]})")
+        print(f"❌ Lighthouse n'est pas utilisé comme une partie d'estimation (status = {lighthouse_status[0]})")
 
     if flowdeck_active[0]:
-        print("✅ Flowdeck v2 detectado")
+        print("✅ Flowdeck v2 détecté")
     else:
-        print("❌ Flowdeck v2 no detectado")
+        print("❌ Flowdeck v2 pas détecté")
 
     if multiranger_active[0]:
-        print("✅ Multi-ranger deck detectado")
+        print("✅ Multi-ranger deck détecté")
     else:
-        print("❌ Multi-ranger deck no detectado")
+        print("❌ Multi-ranger deck pas détecté")
 
     # Exportar a CSV
     df = pd.DataFrame({
@@ -190,6 +219,14 @@ if __name__ == '__main__':
         'roll': kalman_data['roll'],
         'pitch': kalman_data['pitch'],
         'yaw': kalman_data['yaw']
+        'motor.m1': extra_data['motor.m1'],
+        'motor.m2': extra_data['motor.m2'],
+        'motor.m3': extra_data['motor.m3'],
+        'motor.m4': extra_data['motor.m4'],
+        'stabilizer.thrust': extra_data['stabilizer.thrust'],
+        'stabilizer.roll': extra_data['stabilizer.roll'],
+        'stabilizer.pitch': extra_data['stabilizer.pitch'],
+        'stabilizer.yaw': extra_data['stabilizer.yaw']
     })
     df.to_csv("vuelo_datos.csv", index=False)
-    print("Datos exportados a vuelo_datos.csv")
+    print("Donnés exportés à vuelo_datos.csv")
