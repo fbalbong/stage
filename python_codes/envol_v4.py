@@ -20,10 +20,8 @@ start_time = None
 flowdeck_active = [False]
 multiranger_active = [False]
 lighthouse_status = [0]
-extra_data = {
-    'motor.m1': [], 'motor.m2': [], 'motor.m3': [], 'motor.m4': [],
-    'stabilizer.thrust': [], 'stabilizer.roll': [], 'stabilizer.pitch': [], 'stabilizer.yaw': []
-}
+motor_data = {'m1': [], 'm2': [], 'm3': [], 'm4': []}
+stab_data  = {'thrust': [], 'roll': [], 'pitch': [], 'yaw': []}
 
 # === Callbacks ===
 def kalman_callback(timestamp, data, logconf):
@@ -47,15 +45,17 @@ def lighthouse_callback(timestamp, data, logconf):
 def lighthouse_status_callback(timestamp, data, logconf):
     lighthouse_status[0] = data['lighthouse.status']
 
-def extra_callback(timestamp, data, logconf):
-    extra_data['motor.m1'].append(data['motor.m1'])
-    extra_data['motor.m2'].append(data['motor.m2'])
-    extra_data['motor.m3'].append(data['motor.m3'])
-    extra_data['motor.m4'].append(data['motor.m4'])
-    extra_data['stabilizer.thrust'].append(data['stabilizer.thrust'])
-    extra_data['stabilizer.roll'].append(data['stabilizer.roll'])
-    extra_data['stabilizer.pitch'].append(data['stabilizer.pitch'])
-    extra_data['stabilizer.yaw'].append(data['stabilizer.yaw'])
+def motor_callback(ts, data, logconf):
+    motor_data['m1'].append(data['motor.m1'])
+    motor_data['m2'].append(data['motor.m2'])
+    motor_data['m3'].append(data['motor.m3'])
+    motor_data['m4'].append(data['motor.m4'])
+
+def stab_callback(ts, data, logconf):
+    stab_data['thrust'].append(data['stabilizer.thrust'])
+    stab_data['roll'].append(data['stabilizer.roll'])
+    stab_data['pitch'].append(data['stabilizer.pitch'])
+    stab_data['yaw'].append(data['stabilizer.yaw'])
 
 # Creo que puedo quitar este def range_callback, probar
 def range_callback(timestamp, data, logconf):
@@ -159,17 +159,21 @@ if __name__ == '__main__':
         logconf_range.data_received_cb.add_callback(range_callback)
         logconf_range.start()
 
-        # Jules
-        lc_ex = LogConfig(name='Extra', period_in_ms=20)
-        for var in [
-            'motor.m1', 'motor.m2', 'motor.m3', 'motor.m4',
-            'stabilizer.thrust', 'stabilizer.roll',
-            'stabilizer.pitch', 'stabilizer.yaw'
-        ]:
-            lc_ex.add_variable(var, 'float')
-        scf.cf.log.add_config(lc_ex)
-        lc_ex.data_received_cb.add_callback(extra_callback)
-        lc_ex.start()
+        # --- Log Motors ---
+        lc_mot = LogConfig('Motors', period_in_ms=20)
+        for v in ['motor.m1','motor.m2','motor.m3','motor.m4']:
+            lc_mot.add_variable(v,'float')
+        scf.cf.log.add_config(lc_mot)
+        lc_mot.data_received_cb.add_callback(motor_callback)
+        lc_mot.start()
+
+        # --- Log Stabilizer ---
+        lc_st = LogConfig('Stabilizer', period_in_ms=20)
+        for v in ['stabilizer.thrust','stabilizer.roll','stabilizer.pitch','stabilizer.yaw']:
+            lc_st.add_variable(v,'float')
+        scf.cf.log.add_config(lc_st)
+        lc_st.data_received_cb.add_callback(stab_callback)
+        lc_st.start()
 
         # Trajectoire souhaitée
         trajectory = [
@@ -218,15 +222,15 @@ if __name__ == '__main__':
         'z_lh': lighthouse_data['z'],
         'roll': kalman_data['roll'],
         'pitch': kalman_data['pitch'],
-        'yaw': kalman_data['yaw']
-        'motor.m1': extra_data['motor.m1'],
-        'motor.m2': extra_data['motor.m2'],
-        'motor.m3': extra_data['motor.m3'],
-        'motor.m4': extra_data['motor.m4'],
-        'stabilizer.thrust': extra_data['stabilizer.thrust'],
-        'stabilizer.roll': extra_data['stabilizer.roll'],
-        'stabilizer.pitch': extra_data['stabilizer.pitch'],
-        'stabilizer.yaw': extra_data['stabilizer.yaw']
+        'yaw': kalman_data['yaw'],
+        'motor.m1':          motor_data['m1'],
+        'motor.m2':          motor_data['m2'],
+        'motor.m3':          motor_data['m3'],
+        'motor.m4':          motor_data['m4'],
+        'stabilizer.thrust': stab_data['thrust'],
+        'stabilizer.roll':   stab_data['roll'],
+        'stabilizer.pitch':  stab_data['pitch'],
+        'stabilizer.yaw':    stab_data['yaw'],
     })
     df.to_csv("vuelo_datos.csv", index=False)
     print("Donnés exportés à vuelo_datos.csv")
