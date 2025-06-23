@@ -49,6 +49,7 @@ typedef enum {
   MeasurementTypePose,
   MeasurementTypeDistance,
   MeasurementTypeTOF,
+  MeasurementTypeUpTOF,
   MeasurementTypeAbsoluteHeight,
   MeasurementTypeFlow,
   MeasurementTypeYawError,
@@ -68,6 +69,7 @@ typedef struct
     poseMeasurement_t pose;
     distanceMeasurement_t distance;
     tofMeasurement_t tof;
+    tofMeasurement_t uptof;
     heightMeasurement_t height;
     flowMeasurement_t flow;
     yawErrorMeasurement_t yawError;
@@ -125,6 +127,14 @@ static inline void estimatorEnqueueTOF(const tofMeasurement_t *tof)
 {
   measurement_t m;
   m.type = MeasurementTypeTOF;
+  m.data.tof = *tof;
+  estimatorEnqueue(&m);
+}
+
+static inline void estimatorEnqueueUpTOF(const tofMeasurement_t *tof)
+{
+  measurement_t m;
+  m.type = MeasurementTypeUpTOF;
   m.data.tof = *tof;
   estimatorEnqueue(&m);
 }

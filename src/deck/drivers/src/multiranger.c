@@ -41,6 +41,8 @@
 
 #include <stdlib.h>
 
+#include "cf_math.h"
+
 static bool isInit = false;
 static bool isTested = false;
 static bool isPassed = false;
@@ -52,11 +54,20 @@ static uint16_t filterMask = 1 << VL53L1_RANGESTATUS_RANGE_VALID;
 #define MR_PIN_LEFT PCA95X4_P6
 #define MR_PIN_RIGHT PCA95X4_P2
 
+#define RANGE_UP_OUTLIER_LIMIT 5000 // the measured range is in [mm]
+
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devFront;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devBack;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devUp;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devLeft;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devRight;
+
+// Measurement noise model
+static const float expPointA = 2.5f;
+static const float expStdA = 0.0025f; // STD at elevation expPointA [m]
+static const float expPointB = 4.0f;
+static const float expStdB = 0.2f;    // STD at elevation expPointB [m]
+static float expCoeff;
 
 static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
 {
@@ -79,6 +90,9 @@ static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
     }
 
     return status;
+
+    // pre-compute constant in the measurement noise model for kalman
+    expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
 }
 
 static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
@@ -136,11 +150,19 @@ static void mrTask(void *param)
     while (1)
     {
         vTaskDelayUntil(&lastWakeTime, M2T(100));
+        float distanceUp = mrGetMeasurementAndRestart(&devUp) / 1000.0f;
         rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
         rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
+        rangeSet(rangeUp, distanceUp);
         rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
         rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
         rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
+
+        // Add up range to kalman filter measurements
+        if (distanceUp < RANGE_UP_OUTLIER_LIMIT) {
+            float stdDev = expStdA * (1.0f  + expf( expCoeff * (distanceUp - expPointA)));
+            rangeEnqueueUpRangeInEstimator(distanceUp, stdDev, xTaskGetTickCount());
+        }
     }
 }
 

@@ -60,7 +60,7 @@
 // Indexes to access the quad's state, stored as a column vector
 typedef enum
 {
-  KC_STATE_X, KC_STATE_Y, KC_STATE_Z, KC_STATE_PX, KC_STATE_PY, KC_STATE_PZ, KC_STATE_D0, KC_STATE_D1, KC_STATE_D2, KC_STATE_DIM
+  KC_STATE_X, KC_STATE_Y, KC_STATE_Z, KC_STATE_PX, KC_STATE_PY, KC_STATE_PZ, KC_STATE_D0, KC_STATE_D1, KC_STATE_D2, KC_STATE_F, KC_STATE_R, KC_STATE_DIM
 } kalmanCoreStateIdx_t;
 
 
@@ -73,7 +73,8 @@ typedef struct {
    * - X, Y, Z: the quad's position in the global frame
    * - PX, PY, PZ: the quad's velocity in its body frame
    * - D0, D1, D2: attitude error
-   *
+   * - F: estimated distance from the starting z position to what is below the CF
+   * - R: estimated distance from the starting z position to the current roof above the CF 
    * For more information, refer to the paper
    */
   float S[KC_STATE_DIM];
@@ -100,6 +101,8 @@ typedef struct {
 
   uint32_t lastPredictionMs;
   uint32_t lastProcessNoiseUpdateMs;
+
+  bool stateRInitialized; // Flag to signal if R has been initialized
 } kalmanCoreData_t;
 
 // The parameters used by the filter

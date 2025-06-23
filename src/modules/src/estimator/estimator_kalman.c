@@ -124,6 +124,9 @@ const uint32_t PREDICTION_UPDATE_INTERVAL_MS = 1000 / PREDICT_RATE;
 static bool robustTwr = false;
 static bool robustTdoa = false;
 
+// Nonzero to take advantage of the extended state (F and R) to get a better estimate of Z
+static bool useFAndR = true;
+
 /**
  * Quadrocopter State
  *
@@ -131,7 +134,8 @@ static bool robustTdoa = false;
  * - X, Y, Z: the quad's position in the global frame
  * - PX, PY, PZ: the quad's velocity in its body frame
  * - D0, D1, D2: attitude error
- *
+ * - F: estimated distance from the starting z position to what is below the CF
+ * - R: estimated distance from the starting z position to the current roof above the CF 
  * For more information, refer to the paper
  */
 
@@ -325,12 +329,31 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         break;
       case MeasurementTypeTOF:
         kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
+        if(useFAndR){
+          // Tof update using the estimated height of the floor (f)
+          kalmanCoreUpdateWithTofUsingF(&coreData, &m.data.tof);
+        }else{
+          // Standard Tof update
+          kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
+        }
+        break;
+      case MeasurementTypeUpTOF:
+        if(useFAndR){
+          // Tof update using the upward range measurement and the estimated height of the roof (r)
+          kalmanCoreUpdateWithUpTofUsingR(&coreData, &m.data.tof);
+        }
         break;
       case MeasurementTypeAbsoluteHeight:
         kalmanCoreUpdateWithAbsoluteHeight(&coreData, &m.data.height);
         break;
       case MeasurementTypeFlow:
-        kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
+        if(useFAndR){
+          // Flow update using the estimated height of the floor 
+          kalmanCoreUpdateWithFlowUsingF(&coreData, &m.data.flow, &gyroLatest);
+        }else{
+          // Standard flow update
+          kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
+        }
         break;
       case MeasurementTypeYawError:
         kalmanCoreUpdateWithYawError(&coreData, &m.data.yawError);
@@ -440,6 +463,15 @@ LOG_GROUP_START(kalman)
   */
   LOG_ADD(LOG_FLOAT, stateD2, &coreData.S[KC_STATE_D2])
   /**
+  * @brief Estimated floor height compared to the reference point where Z = 0
+  */  
+  LOG_ADD(LOG_FLOAT, stateF, &coreData.S[KC_STATE_F])
+  /**
+  * @brief Estimated roof height compared to the reference point where Z = 0
+  */  
+  LOG_ADD(LOG_FLOAT, stateR, &coreData.S[KC_STATE_R])
+  /**
+  /**
   * @brief Covariance matrix position x
   */
   LOG_ADD(LOG_FLOAT, varX, &coreData.P[KC_STATE_X][KC_STATE_X])
@@ -475,6 +507,14 @@ LOG_GROUP_START(kalman)
   * @brief Covariance matrix attitude error yaw
   */
   LOG_ADD(LOG_FLOAT, varD2, &coreData.P[KC_STATE_D2][KC_STATE_D2])
+  /**
+  * @brief Covariance matrix floor height estimate
+  */
+  LOG_ADD(LOG_FLOAT, varF, &coreData.P[KC_STATE_F][KC_STATE_F])
+  /**
+  * @brief Covariance matrix roof height estimate
+  */
+  LOG_ADD(LOG_FLOAT, varR, &coreData.P[KC_STATE_R][KC_STATE_R])
   /**
   * @brief Estimated Attitude quarternion w
   */
@@ -526,6 +566,10 @@ PARAM_GROUP_START(kalman)
  * @brief Nonzero to use robust TWR method (default: 0)
  */
   PARAM_ADD_CORE(PARAM_UINT8, robustTwr, &robustTwr)
+/**
+ * @brief Nonzero to use F (floor height) and R (roof height) in the estimation for a better Z estimate
+ */
+  PARAM_ADD_CORE(PARAM_UINT8, useFAndR, &useFAndR)
 /**
  * @brief Process noise for x and y acceleration
  */

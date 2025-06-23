@@ -61,6 +61,7 @@
 
 #include "physicalConstants.h"
 
+#include "param.h"
 #include "math3d.h"
 #include "static_mem.h"
 
@@ -122,6 +123,14 @@ static void assertStateNotNaN(const kalmanCoreData_t* this)
 // Small number epsilon, to prevent dividing by zero
 #define EPS (1e-6f)
 
+// Initial things from changes multiranger deck
+static const float stdDevInitialF = 0; // initialF is almost true by definition 
+static const float stdDevInitialR = 0;
+static float procNoiseF = 0; // This could be tuned to some other value, but it seems natural for it to be 0
+static float procNoiseR = 0; // This could be tuned to some other value, but it seems natural for it to be 0
+static float initialF = 0.0;
+static float initialR = -1.0; // It does not matter since it is overwritten on the first range up measurement (as long as stateRInitialized is set to false).
+
 void kalmanCoreDefaultParams(kalmanCoreParams_t* params)
 {
   // Initial variances, uncertain of position, but know we're stationary and roughly flat
@@ -166,6 +175,11 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, co
 //  this->S[KC_STATE_D0] = 0;
 //  this->S[KC_STATE_D1] = 0;
 //  this->S[KC_STATE_D2] = 0;
+  this->S[KC_STATE_F] = initialF; 
+  this->S[KC_STATE_R] = initialR; 
+  // The stateRInitialized is set to false, so that the first range up measurement will set the initial value.
+  this->stateRInitialized = false; 
+
 
   // reset the attitude quaternion
   this->initialQuaternion[0] = arm_cos_f32(params->initialYaw / 2);
@@ -197,6 +211,9 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, co
   this->P[KC_STATE_D0][KC_STATE_D0] = powf(params->stdDevInitialAttitude_rollpitch, 2);
   this->P[KC_STATE_D1][KC_STATE_D1] = powf(params->stdDevInitialAttitude_rollpitch, 2);
   this->P[KC_STATE_D2][KC_STATE_D2] = powf(params->stdDevInitialAttitude_yaw, 2);
+
+  this->P[KC_STATE_F][KC_STATE_F] = powf(stdDevInitialF, 2);
+  this->P[KC_STATE_R][KC_STATE_R] = powf(stdDevInitialR, 2);
 
   this->Pm.numRows = KC_STATE_DIM;
   this->Pm.numCols = KC_STATE_DIM;
@@ -383,6 +400,9 @@ static void predictDt(kalmanCoreData_t* this, Axis3f *acc, Axis3f *gyro, float d
   A[KC_STATE_D0][KC_STATE_D0] = 1;
   A[KC_STATE_D1][KC_STATE_D1] = 1;
   A[KC_STATE_D2][KC_STATE_D2] = 1;
+
+  A[KC_STATE_F][KC_STATE_F] = 1;
+  A[KC_STATE_R][KC_STATE_R] = 1; 
 
   // position from body-frame velocity
   A[KC_STATE_X][KC_STATE_PX] = this->R[0][0]*dt;
@@ -592,6 +612,9 @@ static void addProcessNoiseDt(kalmanCoreData_t *this, const kalmanCoreParams_t *
   this->P[KC_STATE_D1][KC_STATE_D1] += powf(params->measNoiseGyro_rollpitch * dt + params->procNoiseAtt, 2);
   this->P[KC_STATE_D2][KC_STATE_D2] += powf(params->measNoiseGyro_yaw * dt + params->procNoiseAtt, 2);
 
+  this->P[KC_STATE_F][KC_STATE_F] += powf(procNoiseF, 2);
+  this->P[KC_STATE_R][KC_STATE_R] += powf(procNoiseR, 2);
+
   for (int i=0; i<KC_STATE_DIM; i++) {
     for (int j=i; j<KC_STATE_DIM; j++) {
       float p = 0.5f*this->P[i][j] + 0.5f*this->P[j][i];
@@ -683,6 +706,9 @@ bool kalmanCoreFinalize(kalmanCoreData_t* this)
     A[KC_STATE_PX][KC_STATE_PX] = 1;
     A[KC_STATE_PY][KC_STATE_PY] = 1;
     A[KC_STATE_PZ][KC_STATE_PZ] = 1;
+
+    A[KC_STATE_F][KC_STATE_F] = 1;
+    A[KC_STATE_R][KC_STATE_R] = 1;
 
     A[KC_STATE_D0][KC_STATE_D0] =  1 - d1*d1/2 - d2*d2/2;
     A[KC_STATE_D0][KC_STATE_D1] =  d2 + d0*d1/2;
@@ -810,3 +836,22 @@ void kalmanCoreDecoupleXY(kalmanCoreData_t* this)
   decoupleState(this, KC_STATE_Y);
   decoupleState(this, KC_STATE_PY);
 }
+
+PARAM_GROUP_START(kalman)
+/**
+ * @brief Process noise for F (floor height)
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, pNF, &procNoiseF)
+ /**
+ * @brief Process noise for R (roof height)
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, pNR, &procNoiseR)
+/**
+ * @brief Initial F (floor height) after reset [m]
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialF, &initialF)
+ /**
+ * @brief Initial R (roof height) after reset [m] (does not really matter since the first range up measurement after reset is used to initialize)
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialR, &initialR)
+PARAM_GROUP_STOP(kalman)
