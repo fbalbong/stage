@@ -41,6 +41,9 @@
 
 #include <stdlib.h>
 
+#include "cf_math.h"
+
+
 static bool isInit = false;
 static bool isTested = false;
 static bool isPassed = false;
