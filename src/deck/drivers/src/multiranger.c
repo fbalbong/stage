@@ -43,10 +43,6 @@
 
 #include "cf_math.h"
 
-<<<<<<< HEAD
-
-=======
->>>>>>> 120ddea88640c11a536f315355948c1d5cbc3bf8
 static bool isInit = false;
 static bool isTested = false;
 static bool isPassed = false;
@@ -96,7 +92,7 @@ static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
     return status;
 
     // pre-compute constant in the measurement noise model for kalman
-    expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
+    expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
 }
 
 static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)

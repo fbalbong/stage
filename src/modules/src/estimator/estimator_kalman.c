@@ -471,7 +471,6 @@ LOG_GROUP_START(kalman)
   */  
   LOG_ADD(LOG_FLOAT, stateR, &coreData.S[KC_STATE_R])
   /**
-  /**
   * @brief Covariance matrix position x
   */
   LOG_ADD(LOG_FLOAT, varX, &coreData.P[KC_STATE_X][KC_STATE_X])
