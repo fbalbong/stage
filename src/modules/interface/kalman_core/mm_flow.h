@@ -29,3 +29,4 @@
 
 // Measurements of flow (dnx, dny)
 void kalmanCoreUpdateWithFlow(kalmanCoreData_t* this, const flowMeasurement_t *flow, const Axis3f *gyro);
+void kalmanCoreUpdateWithFlowUsingF(kalmanCoreData_t* this, const flowMeasurement_t *flow, const Axis3f *gyro);
