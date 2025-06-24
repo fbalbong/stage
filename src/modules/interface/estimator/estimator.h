@@ -135,7 +135,7 @@ static inline void estimatorEnqueueUpTOF(const tofMeasurement_t *tof)
 {
   measurement_t m;
   m.type = MeasurementTypeUpTOF;
-  m.data.tof = *tof;
+  m.data.uptof = *tof;
   estimatorEnqueue(&m);
 }
 
