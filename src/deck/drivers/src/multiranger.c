@@ -54,7 +54,8 @@ static uint16_t filterMask = 1 << VL53L1_RANGESTATUS_RANGE_VALID;
 #define MR_PIN_LEFT PCA95X4_P6
 #define MR_PIN_RIGHT PCA95X4_P2
 
-#define RANGE_UP_OUTLIER_LIMIT 5000 // the measured range is in [mm]
+#define RANGE_OUTLIER_LIMIT 5000 // the measured range is in [mm]
+#define RANGE_MIN_MM 20          // Minimum valid range in mm
 
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devFront;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devBack;
@@ -62,7 +63,7 @@ NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devUp;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devLeft;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devRight;
 
-// Measurement noise model
+// Measurement noise model (from zranger2)
 static const float expPointA = 2.5f;
 static const float expStdA = 0.0025f; // STD at elevation expPointA [m]
 static const float expPointB = 4.0f;
@@ -90,11 +91,9 @@ static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
     }
 
     return status;
-
-    // pre-compute constant in the measurement noise model for kalman
-    expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
 }
 
+// Improved measurement function with zranger2 enhancements
 static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
 {
     VL53L1_Error status = VL53L1_ERROR_NONE;
@@ -110,18 +109,23 @@ static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
 
     status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
 
+    // First check range status (from original multiranger)
     if (filterMask & (1 << rangingData.RangeStatus))
     {
         range = rangingData.RangeMilliMeter;
+        
+        // Then apply zranger2 outlier filtering
+        if (range < RANGE_MIN_MM || range > RANGE_OUTLIER_LIMIT) {
+            range = 0; // Invalid range
+        }
     }
     else
     {
-        range = 32767;
+        range = 0; // Invalid status
     }
 
     VL53L1_StopMeasurement(dev);
     status = VL53L1_StartMeasurement(dev);
-    status = status;
 
     return range;
 }
@@ -132,36 +136,56 @@ static void mrTask(void *param)
 
     systemWaitStart();
 
-    // Restart all sensors
-    status = VL53L1_StopMeasurement(&devFront);
-    status = VL53L1_StartMeasurement(&devFront);
-    status = VL53L1_StopMeasurement(&devBack);
-    status = VL53L1_StartMeasurement(&devBack);
-    status = VL53L1_StopMeasurement(&devUp);
-    status = VL53L1_StartMeasurement(&devUp);
-    status = VL53L1_StopMeasurement(&devLeft);
-    status = VL53L1_StartMeasurement(&devLeft);
-    status = VL53L1_StopMeasurement(&devRight);
-    status = VL53L1_StartMeasurement(&devRight);
-    status = status;
+    // Initialize sensors with zranger2 settings
+    VL53L1_StopMeasurement(&devFront);
+    VL53L1_SetDistanceMode(&devFront, VL53L1_DISTANCEMODE_MEDIUM);
+    VL53L1_SetMeasurementTimingBudgetMicroSeconds(&devFront, 25000);
+    VL53L1_StartMeasurement(&devFront);
+
+    VL53L1_StopMeasurement(&devBack);
+    VL53L1_SetDistanceMode(&devBack, VL53L1_DISTANCEMODE_MEDIUM);
+    VL53L1_SetMeasurementTimingBudgetMicroSeconds(&devBack, 25000);
+    VL53L1_StartMeasurement(&devBack);
+
+    VL53L1_StopMeasurement(&devUp);
+    VL53L1_SetDistanceMode(&devUp, VL53L1_DISTANCEMODE_MEDIUM);
+    VL53L1_SetMeasurementTimingBudgetMicroSeconds(&devUp, 25000);
+    VL53L1_StartMeasurement(&devUp);
+
+    VL53L1_StopMeasurement(&devLeft);
+    VL53L1_SetDistanceMode(&devLeft, VL53L1_DISTANCEMODE_MEDIUM);
+    VL53L1_SetMeasurementTimingBudgetMicroSeconds(&devLeft, 25000);
+    VL53L1_StartMeasurement(&devLeft);
+
+    VL53L1_StopMeasurement(&devRight);
+    VL53L1_SetDistanceMode(&devRight, VL53L1_DISTANCEMODE_MEDIUM);
+    VL53L1_SetMeasurementTimingBudgetMicroSeconds(&devRight, 25000);
+    VL53L1_StartMeasurement(&devRight);
 
     TickType_t lastWakeTime = xTaskGetTickCount();
 
     while (1)
     {
-        vTaskDelayUntil(&lastWakeTime, M2T(100));
-        float distanceUp = mrGetMeasurementAndRestart(&devUp) / 1000.0f;
-        rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
-        rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
-        rangeSet(rangeUp, distanceUp);
-        rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
-        rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
-        rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
+        vTaskDelayUntil(&lastWakeTime, M2T(25)); // Faster 40Hz update like zranger2
 
-        // Add up range to kalman filter measurements
-        if (distanceUp < RANGE_UP_OUTLIER_LIMIT) {
-            float stdDev = expStdA * (1.0f  + expf( expCoeff * (distanceUp - expPointA)));
-            rangeEnqueueUpRangeInEstimator(distanceUp, stdDev, xTaskGetTickCount());
+        // Get measurements with improved filtering
+        uint16_t front_range = mrGetMeasurementAndRestart(&devFront);
+        uint16_t back_range = mrGetMeasurementAndRestart(&devBack);
+        uint16_t up_range = mrGetMeasurementAndRestart(&devUp);
+        uint16_t left_range = mrGetMeasurementAndRestart(&devLeft);
+        uint16_t right_range = mrGetMeasurementAndRestart(&devRight);
+
+        // Convert to meters and set ranges
+        rangeSet(rangeFront, front_range / 1000.0f);
+        rangeSet(rangeBack, back_range / 1000.0f);
+        rangeSet(rangeLeft, left_range / 1000.0f);
+        rangeSet(rangeRight, right_range / 1000.0f);
+
+        // Special handling for up range (don't set rangeUp to avoid z interference)
+        if (up_range < RANGE_OUTLIER_LIMIT && up_range > RANGE_MIN_MM) {
+            float distance = up_range / 1000.0f;
+            float stdDev = expStdA * (1.0f + expf(expCoeff * (distance - expPointA)));
+            rangeEnqueueUpRangeInEstimator(distance, stdDev, xTaskGetTickCount());
         }
     }
 }
@@ -188,6 +212,9 @@ static void mrInit()
                        MR_PIN_LEFT |
                        MR_PIN_FRONT |
                        MR_PIN_BACK);
+
+    // Pre-compute noise model constant (from zranger2)
+    expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
 
     isInit = true;
 
