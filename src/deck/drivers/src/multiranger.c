@@ -55,14 +55,6 @@ static uint16_t filterMask = 1 << VL53L1_RANGESTATUS_RANGE_VALID;
 #define MR_PIN_RIGHT PCA95X4_P2
 
 #define RANGE_UP_OUTLIER_LIMIT 5000 // the measured range is in [mm]
-#define RANGE_MIN_MM 5              // Mínimo rango válido (evita 0mm)
-
-// Variables para almacenar últimos valores válidos
-static uint16_t lastValidRangeFront = 1000;  // Valor inicial: 1m
-static uint16_t lastValidRangeBack = 1000;
-static uint16_t lastValidRangeUp = 1000;
-static uint16_t lastValidRangeLeft = 1000;
-static uint16_t lastValidRangeRight = 1000;
 
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devFront;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devBack;
@@ -103,42 +95,34 @@ static bool mrInitSensor(VL53L1_Dev_t *pdev, uint32_t pca95pin, char *name)
     expCoeff = logf(expStdB / expStdA) / (expPointB - expPointA);
 }
 
-static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev, uint16_t *lastValidRange) {
+static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
+{
     VL53L1_Error status = VL53L1_ERROR_NONE;
     VL53L1_RangingMeasurementData_t rangingData;
     uint8_t dataReady = 0;
     uint16_t range;
 
-    while (dataReady == 0) {
+    while (dataReady == 0)
+    {
         status = VL53L1_GetMeasurementDataReady(dev, &dataReady);
         vTaskDelay(M2T(1));
     }
 
     status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
 
-    // Filtrado combinado:
-    // 1. Status válido (filterMask)
-    // 2. Rango dentro de límites físicos (20mm < x < 5000mm)
-    if ((filterMask & (1 << rangingData.RangeStatus))) {
+    if (filterMask & (1 << rangingData.RangeStatus))
+    {
         range = rangingData.RangeMilliMeter;
-
-        // Filtro de outliers y consistencia
-        if (range >= RANGE_MIN_MM && range <= RANGE_OUTLIER_LIMIT_MM) {
-            // Filtro de histéresis: ignora cambios bruscos (>500mm)
-            if (*lastValidRange != 0 && abs(range - *lastValidRange) > 500) {
-                range = *lastValidRange;  // Mantiene el último valor válido
-            } else {
-                *lastValidRange = range;  // Actualiza el último valor válido
-            }
-        } else {
-            range = *lastValidRange;  // Usa el último valor válido
-        }
-    } else {
-        range = *lastValidRange;  // Usa el último valor válido
+    }
+    else
+    {
+        range = 32767;
     }
 
     VL53L1_StopMeasurement(dev);
     status = VL53L1_StartMeasurement(dev);
+    status = status;
+
     return range;
 }
 
@@ -166,15 +150,14 @@ static void mrTask(void *param)
     while (1)
     {
         vTaskDelayUntil(&lastWakeTime, M2T(100));
-
-        // Obtiene mediciones con el nuevo filtrado
-        float distanceUp = mrGetMeasurementAndRestart(&devUp, &lastValidRangeUp) / 1000.0f;
-        rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront, &lastValidRangeFront) / 1000.0f);
-        rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack, &lastValidRangeBack) / 1000.0f);
+        float distanceUp = mrGetMeasurementAndRestart(&devUp) / 1000.0f;
+        rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
+        rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
         rangeSet(rangeUp, distanceUp);
-        rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft, &lastValidRangeLeft) / 1000.0f);
-        rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight, &lastValidRangeRight) / 1000.0f);
-        
+        rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
+        rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
+        rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
+
         // Add up range to kalman filter measurements
         if (distanceUp < RANGE_UP_OUTLIER_LIMIT) {
             float stdDev = expStdA * (1.0f  + expf( expCoeff * (distanceUp - expPointA)));
