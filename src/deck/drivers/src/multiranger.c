@@ -100,7 +100,7 @@ static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
     VL53L1_Error status = VL53L1_ERROR_NONE;
     VL53L1_RangingMeasurementData_t rangingData;
     uint8_t dataReady = 0;
-    uint16_t range;
+    uint16_t range = 0;
 
     while (dataReady == 0)
     {
@@ -109,19 +109,10 @@ static uint16_t mrGetMeasurementAndRestart(VL53L1_Dev_t *dev)
     }
 
     status = VL53L1_GetRangingMeasurementData(dev, &rangingData);
-
-    if (filterMask & (1 << rangingData.RangeStatus))
-    {
-        range = rangingData.RangeMilliMeter;
-    }
-    else
-    {
-        range = 32767;
-    }
+    range = rangingData.RangeMilliMeter; // Sin filtro RangeStatus ni 32767
 
     VL53L1_StopMeasurement(dev);
     status = VL53L1_StartMeasurement(dev);
-    status = status;
 
     return range;
 }
@@ -149,21 +140,30 @@ static void mrTask(void *param)
 
     while (1)
     {
-        vTaskDelayUntil(&lastWakeTime, M2T(100));
-        float distanceUp = mrGetMeasurementAndRestart(&devUp) / 1000.0f;
-        rangeSet(rangeFront, mrGetMeasurementAndRestart(&devFront) / 1000.0f);
-        rangeSet(rangeBack, mrGetMeasurementAndRestart(&devBack) / 1000.0f);
-        rangeSet(rangeUp, distanceUp);
-        rangeSet(rangeUp, mrGetMeasurementAndRestart(&devUp) / 1000.0f);
-        rangeSet(rangeLeft, mrGetMeasurementAndRestart(&devLeft) / 1000.0f);
-        rangeSet(rangeRight, mrGetMeasurementAndRestart(&devRight) / 1000.0f);
+    vTaskDelayUntil(&lastWakeTime, M2T(100));
 
-        // Add up range to kalman filter measurements
-        if (distanceUp < RANGE_UP_OUTLIER_LIMIT) {
-            float stdDev = expStdA * (1.0f  + expf( expCoeff * (distanceUp - expPointA)));
-            rangeEnqueueUpRangeInEstimator(distanceUp, stdDev, xTaskGetTickCount());
-        }
+    // Obtén todas las medidas crudas en mm
+    uint16_t rawUp    = mrGetMeasurementAndRestart(&devUp);
+    uint16_t rawFront = mrGetMeasurementAndRestart(&devFront);
+    uint16_t rawBack  = mrGetMeasurementAndRestart(&devBack);
+    uint16_t rawLeft  = mrGetMeasurementAndRestart(&devLeft);
+    uint16_t rawRight = mrGetMeasurementAndRestart(&devRight);
+
+    // Loggea solo si la medida es < 5m
+    if (rawUp    < RANGE_UP_OUTLIER_LIMIT)    rangeSet(rangeUp,    rawUp    / 1000.0f);
+    if (rawFront < RANGE_UP_OUTLIER_LIMIT)    rangeSet(rangeFront, rawFront / 1000.0f);
+    if (rawBack  < RANGE_UP_OUTLIER_LIMIT)    rangeSet(rangeBack,  rawBack  / 1000.0f);
+    if (rawLeft  < RANGE_UP_OUTLIER_LIMIT)    rangeSet(rangeLeft,  rawLeft  / 1000.0f);
+    if (rawRight < RANGE_UP_OUTLIER_LIMIT)    rangeSet(rangeRight, rawRight / 1000.0f);
+
+    // Add up range to kalman filter measurements (solo si es válido)
+    if (rawUp < RANGE_UP_OUTLIER_LIMIT) {
+        float distance = (float)rawUp * 0.001f;
+        float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
+        rangeEnqueueUpRangeInEstimator(distance, stdDev, xTaskGetTickCount());
     }
+    }
+
 }
 
 static void mrInit()
