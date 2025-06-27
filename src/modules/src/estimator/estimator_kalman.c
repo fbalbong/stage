@@ -328,7 +328,6 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         }
         break;
       case MeasurementTypeTOF:
-        kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
         if(useFAndR){
           // Tof update using the estimated height of the floor (f)
           kalmanCoreUpdateWithTofUsingF(&coreData, &m.data.tof);
