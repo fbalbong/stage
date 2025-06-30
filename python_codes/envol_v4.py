@@ -13,8 +13,10 @@ uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
 
 kalman_data = {
     'time': [], 'x': [], 'y': [], 'z': [],
-    'roll': [], 'pitch': [], 'yaw': []
+    'roll': [], 'pitch': [], 'yaw': [],
+    'F' : [],  'R' : [], 'Z' : [],
 }
+
 lighthouse_data = {'x': [], 'y': [], 'z': []}
 start_time = None
 flowdeck_active = [False]
@@ -36,6 +38,11 @@ def kalman_callback(timestamp, data, logconf):
     kalman_data['roll'].append(data['stateEstimate.roll'])
     kalman_data['pitch'].append(data['stateEstimate.pitch'])
     kalman_data['yaw'].append(data['stateEstimate.yaw'])
+    kalman_data['F'].append(data['kalman.stateF'])
+    kalman_data['R'].append(data['kalman.stateR'])
+    kalman_data['Z'].append(data['kalman.stateZ'])
+
+
 
 def lighthouse_callback(timestamp, data, logconf):
     lighthouse_data['x'].append(data['lighthouse.x'])
@@ -178,8 +185,8 @@ if __name__ == '__main__':
         # Trajectoire souhaitée
         trajectory = [
             (0, 0, 0.5, 2),
-            (0.5, 0, 0.5, 2),
-            (0.5, 0.5, 0.5, 2),
+            (1, 0, 0.5, 4),
+            (1, 0.5, 0.5, 4),
             (0, 0.5, 0.5, 2),
             (0, 0, 0.5, 2),
             (0, 0, 0, 1)
@@ -223,6 +230,9 @@ if __name__ == '__main__':
         'roll': kalman_data['roll'],
         'pitch': kalman_data['pitch'],
         'yaw': kalman_data['yaw'],
+        'F': kalman_data['F'],
+        'R': kalman_data['R'],
+        'Z': kalman_data['Z'],
         'motor.m1':          motor_data['m1'],
         'motor.m2':          motor_data['m2'],
         'motor.m3':          motor_data['m3'],
