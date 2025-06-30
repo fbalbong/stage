@@ -38,11 +38,10 @@ def kalman_callback(timestamp, data, logconf):
     kalman_data['roll'].append(data['stateEstimate.roll'])
     kalman_data['pitch'].append(data['stateEstimate.pitch'])
     kalman_data['yaw'].append(data['stateEstimate.yaw'])
-    kalman_data['F'].append(data['kalman.stateF'])
-    kalman_data['R'].append(data['kalman.stateR'])
-    kalman_data['Z'].append(data['kalman.stateZ'])
-
-
+    # Corrección para evitar KeyError si no existen los campos:
+    kalman_data['F'].append(data.get('kalman.stateF', np.nan))
+    kalman_data['R'].append(data.get('kalman.stateR', np.nan))
+    kalman_data['Z'].append(data.get('kalman.stateZ', np.nan))
 
 def lighthouse_callback(timestamp, data, logconf):
     lighthouse_data['x'].append(data['lighthouse.x'])
@@ -64,7 +63,6 @@ def stab_callback(ts, data, logconf):
     stab_data['pitch'].append(data['stabilizer.pitch'])
     stab_data['yaw'].append(data['stabilizer.yaw'])
 
-# Creo que puedo quitar este def range_callback, probar
 def range_callback(timestamp, data, logconf):
     z = data['range.zrange']
     if 0.05 < z < 3.0:
@@ -141,6 +139,12 @@ if __name__ == '__main__':
             'stateEstimate.roll', 'stateEstimate.pitch', 'stateEstimate.yaw'
         ]:
             logconf_kalman.add_variable(var, 'float')
+        # Añade estas variables si existen en tu firmware y quieres loguearlas:
+        for var in ['kalman.stateF', 'kalman.stateR', 'kalman.stateZ']:
+            try:
+                logconf_kalman.add_variable(var, 'float')
+            except Exception:
+                pass  # Si no existen, ignora
         scf.cf.log.add_config(logconf_kalman)
         logconf_kalman.data_received_cb.add_callback(kalman_callback)
         logconf_kalman.start()
