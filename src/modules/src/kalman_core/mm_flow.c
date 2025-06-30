@@ -146,8 +146,8 @@ void kalmanCoreUpdateWithFlowUsingF(kalmanCoreData_t* this, const flowMeasuremen
   // derive measurement equation with respect to dx (not z and f since it caused some bad behaviour)
 
   hx[KC_STATE_PX] = (Npix * flow->dt / thetapix) * (this->R[2][2] / z_g);
-  //hx[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dx_g) / (-z_g * z_g));
-  //hx[KC_STATE_F] = - hx[KC_STATE_Z];
+  hx[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dx_g) / (-z_g * z_g));
+  hx[KC_STATE_F] = - hx[KC_STATE_Z];
   
   //First update
   kalmanCoreScalarUpdate(this, &Hx, (measuredNX-predictedNX), flow->stdDevX*FLOW_RESOLUTION);
@@ -160,8 +160,8 @@ void kalmanCoreUpdateWithFlowUsingF(kalmanCoreData_t* this, const flowMeasuremen
 
   // derive measurement equation with respect to dy (not z and f since it caused some bad behaviour)
   hy[KC_STATE_PY] = (Npix * flow->dt / thetapix) * (this->R[2][2] / z_g);
-  //hy[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dy_g) / (-z_g * z_g));
-  //hy[KC_STATE_F] = - hy[KC_STATE_Z];
+  hy[KC_STATE_Z] = (Npix * flow->dt / thetapix) * ((this->R[2][2] * dy_g) / (-z_g * z_g));
+  hy[KC_STATE_F] = - hy[KC_STATE_Z];
 
   // Second update
   kalmanCoreScalarUpdate(this, &Hy, (measuredNY-predictedNY), flow->stdDevY*FLOW_RESOLUTION);
