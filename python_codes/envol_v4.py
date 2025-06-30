@@ -38,7 +38,9 @@ def kalman_callback(timestamp, data, logconf):
     kalman_data['roll'].append(data['stateEstimate.roll'])
     kalman_data['pitch'].append(data['stateEstimate.pitch'])
     kalman_data['yaw'].append(data['stateEstimate.yaw'])
-    # Corrección para evitar KeyError si no existen los campos:
+
+def kalman_extra_callback(timestamp, data, logconf):
+    # Añade los valores si existen, sino NaN
     kalman_data['F'].append(data.get('kalman.stateF', np.nan))
     kalman_data['R'].append(data.get('kalman.stateR', np.nan))
     kalman_data['Z'].append(data.get('kalman.stateZ', np.nan))
@@ -132,22 +134,28 @@ if __name__ == '__main__':
         time.sleep(1)
         logconf_bat.stop()
 
-        # Kalman
+        # Kalman principal: SOLO estimados principales (6 variables)
         logconf_kalman = LogConfig(name='Kalman', period_in_ms=20)
         for var in [
             'stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
             'stateEstimate.roll', 'stateEstimate.pitch', 'stateEstimate.yaw'
         ]:
             logconf_kalman.add_variable(var, 'float')
-        # Añade estas variables si existen en tu firmware y quieres loguearlas:
-        for var in ['kalman.stateF', 'kalman.stateR', 'kalman.stateZ']:
-            try:
-                logconf_kalman.add_variable(var, 'float')
-            except Exception:
-                pass  # Si no existen, ignora
         scf.cf.log.add_config(logconf_kalman)
         logconf_kalman.data_received_cb.add_callback(kalman_callback)
         logconf_kalman.start()
+
+        # Kalman extra: SOLO F/R/Z (intenta añadirlas y arranca si alguna existe)
+        logconf_kf_extra = LogConfig(name='KalmanF', period_in_ms=20)
+        for var in ['kalman.stateF', 'kalman.stateR', 'kalman.stateZ']:
+            try:
+                logconf_kf_extra.add_variable(var, 'float')
+            except Exception:
+                pass
+        if len(logconf_kf_extra.variables) > 0:
+            scf.cf.log.add_config(logconf_kf_extra)
+            logconf_kf_extra.data_received_cb.add_callback(kalman_extra_callback)
+            logconf_kf_extra.start()
 
         # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
@@ -201,6 +209,11 @@ if __name__ == '__main__':
             send_position(scf.cf, x, y, z, duration)
 
         logconf_kalman.stop()
+        if 'logconf_kf_extra' in locals():
+            try:
+                logconf_kf_extra.stop()
+            except Exception:
+                pass
         logconf_lh.stop()
         logconf_lh_status.stop()
         logconf_range.stop()
