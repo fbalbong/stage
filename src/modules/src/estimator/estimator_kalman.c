@@ -327,8 +327,8 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
             kalmanCoreUpdateWithDistance(&coreData, &m.data.distance);
         }
         break;
-      case MeasurementTypeTOF:
-        if(useFAndR){
+      case MeasurementTypeTOF: 
+        if(useFAndR){ // Aqui puede haber entrada de ruido
           // Tof update using the estimated height of the floor (f)
           kalmanCoreUpdateWithTofUsingF(&coreData, &m.data.tof);
         }else{
@@ -336,8 +336,8 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
           kalmanCoreUpdateWithTof(&coreData, &m.data.tof);
         }
         break;
-      case MeasurementTypeUpTOF:
-        if(useFAndR){
+      case MeasurementTypeUpTOF: 
+        if(useFAndR){ // Aqui puede haber entrada de ruido
           // Tof update using the upward range measurement and the estimated height of the roof (r)
           kalmanCoreUpdateWithUpTofUsingR(&coreData, &m.data.tof);
         }
@@ -346,9 +346,10 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithAbsoluteHeight(&coreData, &m.data.height);
         break;
       case MeasurementTypeFlow:
-        if(useFAndR){
+        if(useFAndR){ // Aqui puede haber entrada de ruido
           // Flow update using the estimated height of the floor 
-          kalmanCoreUpdateWithFlowUsingF(&coreData, &m.data.flow, &gyroLatest);
+          // kalmanCoreUpdateWithFlowUsingF(&coreData, &m.data.flow, &gyroLatest);
+          kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
         }else{
           // Standard flow update
           kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
