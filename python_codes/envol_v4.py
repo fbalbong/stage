@@ -102,11 +102,11 @@ def check_decks_attached(cf):
 
 # === MAIN ===
 if __name__ == '__main__':
-    use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
+    """   use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
     while use_correction not in ['0', '1']:
         use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_correction = int(use_correction)
-
+    """
     lh_method = input("¿Quel method de lighthouse vous voulez utiliser? (0 = Crossing Beams, 1 = Sweep Angle): ")
     while lh_method not in ['0', '1']:
         lh_method = input("Entrée non validée. Écrivez 0 (Crossing Beams) o 1 (Sweep Angle): ")
@@ -117,7 +117,7 @@ if __name__ == '__main__':
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         scf.cf.param.set_value('stabilizer.estimator', '2')
-        scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
+        #scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
         scf.cf.param.set_value('lighthouse.method', str(lh_method))
         reset_estimator(scf.cf)
 
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         logconf_kalman.start()
 
         # Kalman extra: SOLO F/R/Z (intenta añadirlas y arranca si alguna existe)
-        logconf_kf_extra = LogConfig(name='KalmanF', period_in_ms=20)
+        """logconf_kf_extra = LogConfig(name='KalmanF', period_in_ms=20)
         for var in ['kalman.stateF', 'kalman.stateR', 'kalman.stateZ']:
             try:
                 logconf_kf_extra.add_variable(var, 'float')
@@ -156,7 +156,7 @@ if __name__ == '__main__':
             scf.cf.log.add_config(logconf_kf_extra)
             logconf_kf_extra.data_received_cb.add_callback(kalman_extra_callback)
             logconf_kf_extra.start()
-
+        """
         # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
         for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
@@ -196,12 +196,12 @@ if __name__ == '__main__':
 
         # Trajectoire souhaitée
         trajectory = [
-            (0, 0, 0.5, 2),
-            (1, 0, 0.5, 4),
-            (1, 0.5, 0.5, 4),
-            (0, 0.5, 0.5, 2),
-            (0, 0, 0.5, 2),
-            (0, 0, 0, 1)
+            (0, 0, 0.5, 3),
+            (0.5, 0, 0.5, 4),
+            (0.5, 0.5, 0.5, 4),
+            (0, 0.5, 0.5, 4),
+            (0, 0, 0.5, 4),
+            (0, 0, 0, 3)
         ]
 
         # Ejecutar vuelo
@@ -247,9 +247,9 @@ if __name__ == '__main__':
         'roll': kalman_data['roll'],
         'pitch': kalman_data['pitch'],
         'yaw': kalman_data['yaw'],
-        'F': kalman_data['F'],
-        'R': kalman_data['R'],
-        'Z': kalman_data['Z'],
+        #'F': kalman_data['F'],
+        #'R': kalman_data['R'],
+        #'Z': kalman_data['Z'],
         'motor.m1':          motor_data['m1'],
         'motor.m2':          motor_data['m2'],
         'motor.m3':          motor_data['m3'],

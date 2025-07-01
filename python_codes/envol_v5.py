@@ -1,255 +1,125 @@
+import logging
 import time
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-
-import cflib.crtp
+import cflib
 from cflib.crazyflie import Crazyflie
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie.log import LogConfig
 from cflib.utils import uri_helper
+import pandas as pd
 
 uri = uri_helper.uri_from_env(default='radio://0/80/2M/E7E7E7E7E7')
+logging.basicConfig(level=logging.ERROR)
 
-kalman_data = {
-    'time': [], 'x': [], 'y': [], 'z': [],
-    'roll': [], 'pitch': [], 'yaw': []
-}
-lighthouse_data = {'x': [], 'y': [], 'z': []}
-start_time = None
-flowdeck_active = [False]
-multiranger_active = [False]
-lighthouse_status = [0]
 motor_data = {'m1': [], 'm2': [], 'm3': [], 'm4': []}
 stab_data  = {'thrust': [], 'roll': [], 'pitch': [], 'yaw': []}
-
-# === Callbacks ===
-def kalman_callback(timestamp, data, logconf):
-    global start_time
-    if start_time is None:
-        start_time = timestamp
-    t = (timestamp - start_time) / 1000.0
-    kalman_data['time'].append(t)
-    kalman_data['x'].append(data['stateEstimate.x'])
-    kalman_data['y'].append(data['stateEstimate.y'])
-    kalman_data['z'].append(data['stateEstimate.z'])
-    kalman_data['roll'].append(data['stateEstimate.roll'])
-    kalman_data['pitch'].append(data['stateEstimate.pitch'])
-    kalman_data['yaw'].append(data['stateEstimate.yaw'])
-
-def lighthouse_callback(timestamp, data, logconf):
-    lighthouse_data['x'].append(data['lighthouse.x'])
-    lighthouse_data['y'].append(data['lighthouse.y'])
-    lighthouse_data['z'].append(data['lighthouse.z'])
-
-def lighthouse_status_callback(timestamp, data, logconf):
-    lighthouse_status[0] = data['lighthouse.status']
+time_data  = []
 
 def motor_callback(ts, data, logconf):
     motor_data['m1'].append(data['motor.m1'])
     motor_data['m2'].append(data['motor.m2'])
     motor_data['m3'].append(data['motor.m3'])
     motor_data['m4'].append(data['motor.m4'])
+    # Timestamp SOLO si quieres un tiempo por cada log de motor.
+    time_data.append(time.time() - t0)
 
 def stab_callback(ts, data, logconf):
     stab_data['thrust'].append(data['stabilizer.thrust'])
     stab_data['roll'].append(data['stabilizer.roll'])
     stab_data['pitch'].append(data['stabilizer.pitch'])
     stab_data['yaw'].append(data['stabilizer.yaw'])
+    # Opcional: podrías poner aquí también el time_data.append(), pero te saldría el doble de filas si activas ambos logs.
+    # Si quieres UN SOLO CSV, mantén el append solo en motor_callback.
 
-def range_callback(timestamp, data, logconf):
-    z = data['range.zrange']
-    if 0.05 < z < 3.0:
-        flowdeck_active[0] = True
-
-def battery_callback(timestamp, data, logconf):
-    voltage = data['pm.vbat']
-    print(f"🔋 Batería: {voltage:.2f} V")
-
-def arm_dron():
-    with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
-        print("Conectado. Enviando solicitud de ARM...")
-        scf.cf.platform.send_arming_request(True)
-        print("Dron armado.")
-
-def reset_estimator(cf):
-    cf.param.set_value('kalman.resetEstimation', '1')
-    time.sleep(0.1)
-    cf.param.set_value('kalman.resetEstimation', '0')
-
-def check_decks_attached(cf):
-    decks = {
-        'flow2': int(cf.param.get_value('deck.bcFlow2')),
-        'multiranger': int(cf.param.get_value('deck.bcMultiranger'))
-    }
-    return decks
-
-# === VUELO ESCALÓN ROLL/PITCH ===
-def vuelo_escalon(scf):
-    thrust_lift = 55000   # Escalón alto para despegar
-    thrust_hover = 41000  # Mantener en el aire
-    thrust_land = 37000   # Aterrizar suavemente
-    dt = 0.05
-
-    # 1. Escalón: thrust alto durante 0.5 segundos
-    for _ in range(int(0.5/dt)):
-        scf.cf.commander.send_setpoint(0, 0, 0, thrust_lift)
-        time.sleep(dt)
-    # 2. Hover estable durante 2 segundos
-    for _ in range(int(2.0/dt)):
-        scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
-        time.sleep(dt)
-    # 3. Roll 5 grados durante 1 s
-    for _ in range(int(1.0/dt)):
-        scf.cf.commander.send_setpoint(5, 0, 0, thrust_hover)
-        time.sleep(dt)
-    # 4. Roll 0 (vuelta al hover)
-    for _ in range(int(0.5/dt)):
-        scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
-        time.sleep(dt)
-    # 5. Pitch 5 grados durante 1 s
-    for _ in range(int(1.0/dt)):
-        scf.cf.commander.send_setpoint(0, 5, 0, thrust_hover)
-        time.sleep(dt)
-    # 6. Pitch 0 (vuelta al hover)
-    for _ in range(int(0.5/dt)):
-        scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
-        time.sleep(dt)
-    # 7. Descenso suave durante 1 s
-    for _ in range(int(1.0/dt)):
-        scf.cf.commander.send_setpoint(0, 0, 0, thrust_land)
-        time.sleep(dt)
-    # Motores off
-    scf.cf.commander.send_setpoint(0, 0, 0, 0)
-    time.sleep(0.1)
-
-# === MAIN ===
 if __name__ == '__main__':
-    use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
-    while use_correction not in ['0', '1']:
-        use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
-    use_correction = int(use_correction)
-
-    lh_method = input("¿Quel method de lighthouse vous voulez utiliser? (0 = Crossing Beams, 1 = Sweep Angle): ")
-    while lh_method not in ['0', '1']:
-        lh_method = input("Entrée non validée. Écrivez 0 (Crossing Beams) o 1 (Sweep Angle): ")
-    lh_method = int(lh_method)
-    
     cflib.crtp.init_drivers()
-    arm_dron()
-
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
-        scf.cf.param.set_value('stabilizer.estimator', '2')
-        scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
-        scf.cf.param.set_value('lighthouse.method', str(lh_method))
-        reset_estimator(scf.cf)
+        # Armado y desbloqueo de protección
+        scf.cf.platform.send_arming_request(True)
+        time.sleep(1.0)
+        print("Desbloqueando protección de thrust...")
+        for _ in range(10):
+            scf.cf.commander.send_setpoint(0, 0, 0, 0)
+            time.sleep(0.05)
 
-        decks = check_decks_attached(scf.cf)
-        flowdeck_active[0] = decks['flow2'] != 0
-        multiranger_active[0] = decks['multiranger'] != 0
-
-        # Logs
-        logconf_bat = LogConfig(name='Battery', period_in_ms=500)
-        logconf_bat.add_variable('pm.vbat', 'float')
-        scf.cf.log.add_config(logconf_bat)
-        logconf_bat.data_received_cb.add_callback(battery_callback)
-        logconf_bat.start()
-        time.sleep(1)
-        logconf_bat.stop()
-
-        # Kalman
-        logconf_kalman = LogConfig(name='Kalman', period_in_ms=20)
-        for var in [
-            'stateEstimate.x', 'stateEstimate.y', 'stateEstimate.z',
-            'stateEstimate.roll', 'stateEstimate.pitch', 'stateEstimate.yaw'
-        ]:
-            logconf_kalman.add_variable(var, 'float')
-        scf.cf.log.add_config(logconf_kalman)
-        logconf_kalman.data_received_cb.add_callback(kalman_callback)
-        logconf_kalman.start()
-
-        # Lighthouse
-        logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
-        for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
-            logconf_lh.add_variable(var, 'float')
-        scf.cf.log.add_config(logconf_lh)
-        logconf_lh.data_received_cb.add_callback(lighthouse_callback)
-        logconf_lh.start()
-
-        logconf_lh_status = LogConfig(name='LighthouseStatus', period_in_ms=500)
-        logconf_lh_status.add_variable('lighthouse.status', 'uint8_t')
-        scf.cf.log.add_config(logconf_lh_status)
-        logconf_lh_status.data_received_cb.add_callback(lighthouse_status_callback)
-        logconf_lh_status.start()
-
-        # Flowdeck v2
-        logconf_range = LogConfig(name='Range', period_in_ms=20)
-        logconf_range.add_variable('range.zrange', 'float')
-        scf.cf.log.add_config(logconf_range)
-        logconf_range.data_received_cb.add_callback(range_callback)
-        logconf_range.start()
-
-        # --- Log Motors ---
-        lc_mot = LogConfig('Motors', period_in_ms=20)
+        # Configuración de logs
+        logconf_mot = LogConfig('Motors', period_in_ms=20)
         for v in ['motor.m1','motor.m2','motor.m3','motor.m4']:
-            lc_mot.add_variable(v,'float')
-        scf.cf.log.add_config(lc_mot)
-        lc_mot.data_received_cb.add_callback(motor_callback)
-        lc_mot.start()
+            logconf_mot.add_variable(v, 'float')
+        scf.cf.log.add_config(logconf_mot)
+        logconf_mot.data_received_cb.add_callback(motor_callback)
+        logconf_mot.start()
 
-        # --- Log Stabilizer ---
-        lc_st = LogConfig('Stabilizer', period_in_ms=20)
+        logconf_stab = LogConfig('Stabilizer', period_in_ms=20)
         for v in ['stabilizer.thrust','stabilizer.roll','stabilizer.pitch','stabilizer.yaw']:
-            lc_st.add_variable(v,'float')
-        scf.cf.log.add_config(lc_st)
-        lc_st.data_received_cb.add_callback(stab_callback)
-        lc_st.start()
+            logconf_stab.add_variable(v, 'float')
+        scf.cf.log.add_config(logconf_stab)
+        logconf_stab.data_received_cb.add_callback(stab_callback)
+        logconf_stab.start()
 
-        # === Aquí va el vuelo escalón ===
-        vuelo_escalon(scf)
+        global t0
+        t0 = time.time()
 
-        logconf_kalman.stop()
-        logconf_lh.stop()
-        logconf_lh_status.stop()
-        logconf_range.stop()
-        scf.cf.close_link()
+        # Vuelo secuencial
+        thrust_lift = 57000
+        thrust_hover = 39000
+        thrust_mouv = 42000
+        thrust_land1 = 36000
+        thrust_land2 = 28000
+        dt = 0.05
 
-    # Diagnóstico
-    if lighthouse_status[0] == 2:
-        print("✅ Lighthouse est utilisé comme une partie d'estimation (status = 2)")
-    else:
-        print(f"❌ Lighthouse n'est pas utilisé comme une partie d'estimation (status = {lighthouse_status[0]})")
+        print("Despegue...")
+        for _ in range(int(0.3 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_lift)
+            time.sleep(dt)
+        print("Mantener hover...")
+        for _ in range(int(1.0 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
+            time.sleep(dt)
+        print("Roll 5º prolongado...")
+        for _ in range(int(1.2 / dt)):
+            scf.cf.commander.send_setpoint(5, 0, 0, thrust_mouv)
+            time.sleep(dt)
+        print("Volver a hover...")
+        for _ in range(int(0.5 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
+            time.sleep(dt)
+        print("Pitch 5º prolongado...")
+        for _ in range(int(1.2 / dt)):
+            scf.cf.commander.send_setpoint(0, 5, 0, thrust_mouv)
+            time.sleep(dt)
+        print("Volver a hover...")
+        for _ in range(int(0.5 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_hover)
+            time.sleep(dt)
+        print("Aterrizaje fase 1...")
+        for _ in range(int(0.7 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_land1)
+            time.sleep(dt)
+        print("Aterrizaje fase 2...")
+        for _ in range(int(0.7 / dt)):
+            scf.cf.commander.send_setpoint(0, 0, 0, thrust_land2)
+            time.sleep(dt)
+        print("Motores off.")
+        for _ in range(20):
+            scf.cf.commander.send_setpoint(0, 0, 0, 0)
+            time.sleep(dt)
 
-    if flowdeck_active[0]:
-        print("✅ Flowdeck v2 détecté")
-    else:
-        print("❌ Flowdeck v2 pas détecté")
+        # Parar logs
+        logconf_mot.stop()
+        logconf_stab.stop()
 
-    if multiranger_active[0]:
-        print("✅ Multi-ranger deck détecté")
-    else:
-        print("❌ Multi-ranger deck pas détecté")
-
-    # Exportar a CSV
+    # --- Emparejar el número de muestras ---
+    min_len = min(len(time_data), len(motor_data['m1']), len(stab_data['thrust']))
     df = pd.DataFrame({
-        'time': kalman_data['time'],
-        'x_kalman': kalman_data['x'],
-        'y_kalman': kalman_data['y'],
-        'z_kalman': kalman_data['z'],
-        'x_lh': lighthouse_data['x'],
-        'y_lh': lighthouse_data['y'],
-        'z_lh': lighthouse_data['z'],
-        'roll': kalman_data['roll'],
-        'pitch': kalman_data['pitch'],
-        'yaw': kalman_data['yaw'],
-        'motor.m1':          motor_data['m1'],
-        'motor.m2':          motor_data['m2'],
-        'motor.m3':          motor_data['m3'],
-        'motor.m4':          motor_data['m4'],
-        'stabilizer.thrust': stab_data['thrust'],
-        'stabilizer.roll':   stab_data['roll'],
-        'stabilizer.pitch':  stab_data['pitch'],
-        'stabilizer.yaw':    stab_data['yaw'],
+        'time': time_data[:min_len],
+        'motor.m1': motor_data['m1'][:min_len],
+        'motor.m2': motor_data['m2'][:min_len],
+        'motor.m3': motor_data['m3'][:min_len],
+        'motor.m4': motor_data['m4'][:min_len],
+        'stabilizer.thrust': stab_data['thrust'][:min_len],
+        'stabilizer.roll':   stab_data['roll'][:min_len],
+        'stabilizer.pitch':  stab_data['pitch'][:min_len],
+        'stabilizer.yaw':    stab_data['yaw'][:min_len],
     })
-    df.to_csv("vuelo_datos.csv", index=False)
-    print("Donnés exportés à vuelo_datos.csv")
+    df.to_csv("vuelo_datos_thrust.csv", index=False)
+    print("Donnés exportés à vuelo_datos_thrust.csv")
