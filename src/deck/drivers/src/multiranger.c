@@ -140,7 +140,7 @@ static void mrTask(void *param)
 
     while (1)
     {
-    vTaskDelayUntil(&lastWakeTime, M2T(100));
+    vTaskDelayUntil(&lastWakeTime, M2T(25));
 
     // Obtén todas las medidas crudas en mm
     uint16_t rawUp    = mrGetMeasurementAndRestart(&devUp);
