@@ -346,7 +346,9 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
         kalmanCoreUpdateWithAbsoluteHeight(&coreData, &m.data.height);
         break;
       case MeasurementTypeFlow:
-        if(useFAndR){ // Aqui puede haber entrada de ruido
+        if(useFAndR){ // Aqui puede haber entrada de ruido. He visto que quitando esta linea y no utilizando el withflowusingF, desaparece el ruido en roll y yaw.
+          // Además a pesar de que hay veces que va mal (puede ser por inicialización de variables o algo), puedo manejar el dron bastante bien, sin que se estrelle.
+          // Lo que me sigue pareciendo raro es que haya veces que la estimación de R y F diverja 
           // Flow update using the estimated height of the floor 
           // kalmanCoreUpdateWithFlowUsingF(&coreData, &m.data.flow, &gyroLatest);
           kalmanCoreUpdateWithFlow(&coreData, &m.data.flow, &gyroLatest);
