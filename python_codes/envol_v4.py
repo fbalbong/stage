@@ -23,6 +23,7 @@ flowdeck_active = [False]
 multiranger_active = [False]
 lighthouse_status = [0]
 motor_data = {'m1': [], 'm2': [], 'm3': [], 'm4': []}
+motor_data_rpm = {'m1_rpm': [], 'm2_rpm': [], 'm3_rpm': [], 'm4_rpm': []}
 stab_data  = {'thrust': [], 'roll': [], 'pitch': [], 'yaw': []}
 
 # === Callbacks ===
@@ -59,11 +60,17 @@ def motor_callback(ts, data, logconf):
     motor_data['m3'].append(data['motor.m3'])
     motor_data['m4'].append(data['motor.m4'])
 
+def motor_rpm_callback(ts, data, logconf):
+    motor_data_rpm['m1_rpm'].append(data['rpm.m1'])
+    motor_data_rpm['m2_rpm'].append(data['rpm.m2'])
+    motor_data_rpm['m3_rpm'].append(data['rpm.m3'])
+    motor_data_rpm['m4_rpm'].append(data['rpm.m4'])
+
 def stab_callback(ts, data, logconf):
-    stab_data['thrust'].append(data['stabilizer.thrust'])
-    stab_data['roll'].append(data['stabilizer.roll'])
-    stab_data['pitch'].append(data['stabilizer.pitch'])
-    stab_data['yaw'].append(data['stabilizer.yaw'])
+    stab_data['thrust'].append(data['controller.cmd_thrust'])
+    stab_data['roll'].append(data['controller.cmd_roll'])
+    stab_data['pitch'].append(data['controller.cmd_pitch'])
+    stab_data['yaw'].append(data['controller.cmd_yaw'])
 
 def range_callback(timestamp, data, logconf):
     z = data['range.zrange']
@@ -186,9 +193,17 @@ if __name__ == '__main__':
         lc_mot.data_received_cb.add_callback(motor_callback)
         lc_mot.start()
 
-        # --- Log Stabilizer ---
-        lc_st = LogConfig('Stabilizer', period_in_ms=20)
-        for v in ['stabilizer.thrust','stabilizer.roll','stabilizer.pitch','stabilizer.yaw']:
+        # --- Log Motors_rpm ---
+        lc_mot = LogConfig('Motors_rpm', period_in_ms=20)
+        for v in ['rpm.m1','rpm.m2','rpm.m3','rpm.m4']:
+            lc_mot.add_variable(v,'uint16_t')
+        scf.cf.log.add_config(lc_mot)
+        lc_mot.data_received_cb.add_callback(motor_rpm_callback)
+        lc_mot.start()
+
+        # --- Log Controller ---
+        lc_st = LogConfig('Controller', period_in_ms=20)
+        for v in ['controller.cmd_thrust','controller.cmd_roll','controller.cmd_pitch','controller.cmd_yaw']:
             lc_st.add_variable(v,'float')
         scf.cf.log.add_config(lc_st)
         lc_st.data_received_cb.add_callback(stab_callback)
@@ -201,7 +216,7 @@ if __name__ == '__main__':
             (0.5, 0.5, 0.5, 4),
             (0, 0.5, 0.5, 4),
             (0, 0, 0.5, 4),
-            (0, 0, 0, 3)
+            (0, 0, 0, 1)
         ]
 
         # Ejecutar vuelo
@@ -254,10 +269,14 @@ if __name__ == '__main__':
         'motor.m2':          motor_data['m2'],
         'motor.m3':          motor_data['m3'],
         'motor.m4':          motor_data['m4'],
-        'stabilizer.thrust': stab_data['thrust'],
-        'stabilizer.roll':   stab_data['roll'],
-        'stabilizer.pitch':  stab_data['pitch'],
-        'stabilizer.yaw':    stab_data['yaw'],
+        'rpm.m1':          motor_data_rpm['m1_rpm'],
+        'rpm.m2':          motor_data_rpm['m2_rpm'],
+        'rpm.m3':          motor_data_rpm['m3_rpm'],
+        'rpm.m4':          motor_data_rpm['m4_rpm'],
+        'controller.cmd_thrust': stab_data['thrust'],
+        'controller.cmd_roll':   stab_data['roll'],
+        'controller.cmd_pitch':  stab_data['pitch'],
+        'controller.cmd_yaw':    stab_data['yaw'],
     })
     df.to_csv("vuelo_datos.csv", index=False)
     print("Donnés exportés à vuelo_datos.csv")
