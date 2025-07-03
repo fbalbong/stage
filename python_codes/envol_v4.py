@@ -196,7 +196,7 @@ if __name__ == '__main__':
         # --- Log Motors_rpm ---
         lc_mot = LogConfig('Motors_rpm', period_in_ms=20)
         for v in ['rpm.m1','rpm.m2','rpm.m3','rpm.m4']:
-            lc_mot.add_variable(v,'float')
+            lc_mot.add_variable(v,'uint16_t')
         scf.cf.log.add_config(lc_mot)
         lc_mot.data_received_cb.add_callback(motor_rpm_callback)
         lc_mot.start()
@@ -216,7 +216,7 @@ if __name__ == '__main__':
             (0.5, 0.5, 0.5, 4),
             (0, 0.5, 0.5, 4),
             (0, 0, 0.5, 4),
-            (0, 0, 0, 3)
+            (0, 0, 0, 1)
         ]
 
         # Ejecutar vuelo
