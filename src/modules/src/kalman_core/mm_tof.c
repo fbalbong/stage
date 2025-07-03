@@ -81,8 +81,8 @@ void kalmanCoreUpdateWithTofUsingF(kalmanCoreData_t* this, tofMeasurement_t *tof
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / cosf(angle);
-    float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
+    float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / cosf(angle);
+    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
     float error = measuredDistance-predictedDistance;
@@ -94,8 +94,8 @@ void kalmanCoreUpdateWithTofUsingF(kalmanCoreData_t* this, tofMeasurement_t *tof
       if(error*error > threshold*threshold){
         // Give a best first guess of the new floor height and set the variance high
         this->P[KC_STATE_F][KC_STATE_F] = variance_after_detection;
-        this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
-        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*cosf(angle);
+        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
+        this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*cosf(angle);
 
         error = 0;
       }
@@ -104,11 +104,11 @@ void kalmanCoreUpdateWithTofUsingF(kalmanCoreData_t* this, tofMeasurement_t *tof
     //Measurement equation
     //
     // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
-    h[KC_STATE_Z] = 1 / this->R[2][2];
-    //h[KC_STATE_Z] = 1 / cosf(angle);
+    //h[KC_STATE_Z] = 1 / this->R[2][2];
+    h[KC_STATE_Z] = 1 / cosf(angle);
 
-    h[KC_STATE_F] = -1 / this->R[2][2];
-    //h[KC_STATE_F] = -1 / cosf(angle);
+    //h[KC_STATE_F] = -1 / this->R[2][2];
+    h[KC_STATE_F] = -1 / cosf(angle);
 
 
     // Scalar update
@@ -135,8 +135,8 @@ void kalmanCoreUpdateWithUpTofUsingR(kalmanCoreData_t* this, tofMeasurement_t *t
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-    //float predictedDistance = (this->S[KC_STATE_R] - this->S[KC_STATE_Z]) / cosf(angle);
-    float predictedDistance = (this->S[KC_STATE_R] - this->S[KC_STATE_Z]) / this->R[2][2];
+    float predictedDistance = (this->S[KC_STATE_R] - this->S[KC_STATE_Z]) / cosf(angle);
+    //float predictedDistance = (this->S[KC_STATE_R] - this->S[KC_STATE_Z]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
     float error = measuredDistance-predictedDistance;
@@ -147,8 +147,8 @@ void kalmanCoreUpdateWithUpTofUsingR(kalmanCoreData_t* this, tofMeasurement_t *t
       if(error*error > threshold*threshold){
         // Give a best first guess of the new roof height and set the variance high
         this->P[KC_STATE_R][KC_STATE_R] = variance_after_detection;
-        this->S[KC_STATE_R] = measuredDistance*this->R[2][2] + this->S[KC_STATE_Z];
-        // this->S[KC_STATE_R] = measuredDistance*cosf(angle) + this->S[KC_STATE_Z];
+        //this->S[KC_STATE_R] = measuredDistance*this->R[2][2] + this->S[KC_STATE_Z];
+        this->S[KC_STATE_R] = measuredDistance*cosf(angle) + this->S[KC_STATE_Z];
         error = 0;
       }
     }
@@ -156,11 +156,11 @@ void kalmanCoreUpdateWithUpTofUsingR(kalmanCoreData_t* this, tofMeasurement_t *t
     //Measurement equation
     //
     // h = (r - z)/((R*z_b)\dot z_b) = z/cos(alpha)
-    h[KC_STATE_Z] = -1 / this->R[2][2];
-    //h[KC_STATE_Z] = -1 / cosf(angle);
+    //h[KC_STATE_Z] = -1 / this->R[2][2];
+    h[KC_STATE_Z] = -1 / cosf(angle);
 
-    h[KC_STATE_R] = 1 / this->R[2][2];
-    //h[KC_STATE_R] = 1 / cosf(angle);
+    //h[KC_STATE_R] = 1 / this->R[2][2];
+    h[KC_STATE_R] = 1 / cosf(angle);
 
     // Scalar update
     kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
