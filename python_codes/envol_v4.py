@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import os
+from scipy.spatial.transform import Rotation as R
+
 
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
@@ -83,11 +85,43 @@ def battery_callback(timestamp, data, logconf):
     print(f"🔋 Batería: {voltage:.2f} V")
 
 # === Funciones de vuelo y setup ===
-def send_position(cf, x, y, z, duration):
+"""def send_position(cf, x, y, z, duration):
     dt = 0.1 
     steps = int(duration / dt)
     for _ in range(steps):
         cf.commander.send_position_setpoint(x, y, z, 0)
+        time.sleep(dt)
+""" 
+def send_position_with_velocity(cf, start_pos, end_pos, max_speed=0.5, dt=0.1):
+    start_pos = np.array(start_pos)
+    end_pos = np.array(end_pos)
+    direction = end_pos - start_pos
+    distance = np.linalg.norm(direction)
+
+    if distance == 0:
+        return
+
+    direction_unit = direction / distance
+    duration = distance / max_speed
+    steps = int(duration / dt)
+
+    # Variables fijas
+    velocity = direction_unit * max_speed
+    acceleration = np.array([0, 0, 0])
+    orientation_quat = R.from_euler('xyz', [0, 0, 0]).as_quat()  # sin rotación
+    rollrate = pitchrate = yawrate = 0
+
+    for i in range(steps):
+        pos = start_pos + direction_unit * max_speed * i * dt
+        cf.commander.send_full_state_setpoint(
+            pos=pos,
+            vel=velocity,
+            acc=acceleration,
+            orientation=orientation_quat,
+            rollrate=rollrate,
+            pitchrate=pitchrate,
+            yawrate=yawrate
+        )
         time.sleep(dt)
 
 def arm_dron():
@@ -222,13 +256,17 @@ if __name__ == '__main__':
             (1.5, 0, 0.5, 4),
             (1.5, 1, 0.5, 4),
             (0, 1, 0.5, 4),
-            (0, -0.5, 0.5, 4),
-            (0, -0.5, 0, 1)
+            (-0.5, 0, 0.5, 4),
+            (-0.5, 0, 0, 1)
         ]
 
-        # Ejecutar vuelo
-        for x, y, z, duration in trajectory:
-            send_position(scf.cf, x, y, z, duration)
+        for i in range(len(trajectory) - 1):
+            start = trajectory[i][:3]
+            end = trajectory[i+1][:3]
+            pause_time = trajectory[i][3]
+            send_position_with_velocity(scf.cf, start, end, max_speed=0.5, dt=0.1)
+            time.sleep(pause_time)  # ⏸️ Pausa en el punto de llegada
+
 
         logconf_kalman.stop()
         if 'logconf_kf_extra' in locals():

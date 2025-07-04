@@ -5,12 +5,16 @@ gm = fegeometry("drone.stl");
 pdegplot(gm,FaceLabels="on",FaceAlpha=0.3)
 
 % === 1) Leer CSV ===
-data = readtable('vuelo_datos.csv');
+data = readtable('vuelo_datos6.csv');
 x_k = data.x_kalman;   y_k = data.y_kalman;   z_k = data.z_kalman;
 x_lh = data.x_lh;      y_lh = data.y_lh;      z_lh = data.z_lh;
 roll  = deg2rad(data.roll);    pitch = deg2rad(data.pitch);    yaw = deg2rad(data.yaw);
 m1 = data.motor_m1;    m2 = data.motor_m2;    m3 = data.motor_m3;    m4 = data.motor_m4;
 t = data.time;         n = length(t);
+f_val = data.F;
+r_val = data.R;
+z_val = data.Z; 
+
 
 % === 2) Leer STL ===
 [faces, verts0] = readSTLpatch('drone.stl');
@@ -40,19 +44,22 @@ end
 % === 5) Figura ===
 fig = figure('Color',[0.05 0.05 0.05],...
              'Units','normalized','OuterPosition',[0 0 1 1]);
-ax = axes('Parent',fig); axis equal; hold(ax,'on'); grid(ax,'on');
+ax = axes('Parent',fig); axis normal; hold(ax,'on'); grid(ax,'on');
 set(ax,'XColor','w','YColor','w','ZColor','w','Color',[0.05 0.05 0.05]);
 xlabel(ax,'X (m)','Color','w');   ylabel(ax,'Y (m)','Color','w');   zlabel(ax,'Z (m)','Color','w');
 title(ax,'Crazyflie 2.1 – Trayectoria & Motores','Color','w');
 m = 0.05;
 xlim([min([x_k;x_lh])-m, max([x_k;x_lh])+m]);
 ylim([min([y_k;y_lh])-m, max([y_k;y_lh])+m]);
-zlim([min([z_k;z_lh])-m, max([z_k;z_lh])+m]);
+zlim([min([f_val;z_k;z_lh])-m, max([r_val;z_k;z_lh])+m]);
+% pbaspect(ax, [4 4 1]);
+% pbaspect auto;
+
 light('Parent',ax,'Position',[1 1 5],'Style','infinite');
 material(ax,'dull');
 
 % === 6) Trayectorias ===
-hKalman = animatedline(ax,'Color',[0.2 0.6 1],'LineWidth',2,'DisplayName','Kalman');
+hKalman = animatedline(ax,'Color',[0.4 0.6 1],'LineWidth',2,'DisplayName','Kalman');
 hLh     = animatedline(ax,'Color',[1 0.4 0.4],'LineStyle','--','LineWidth',2,'DisplayName','Lighthouse');
 
 % === 7) Dron STL ===
@@ -81,17 +88,27 @@ for k = 1:4
         'DisplayName',sprintf('Motor %d',k));
 end
 
-% === 10) Leyenda manual ===
-legend(ax, [hKalman,hLh,hX,hY,hZ,rotor_arrows'], ...
+% === 9.2) Acumulación SLAM de puntos estimados de obstáculos y techo ===
+obs_f_X = []; obs_f_Y = []; obs_f_Z = [];
+obs_r_X = []; obs_r_Y = []; obs_r_Z = [];
+
+h_obs_f = scatter3(ax, [], [], [], 10, [1, 0.5, 0], 'filled', 'DisplayName','Obstáculo Inferior','MarkerFaceColor','flat');
+h_obs_r = scatter3(ax, [], [], [], 10, [0.4, 0.6, 1], 'filled', 'DisplayName','Techo');
+
+
+legend(ax, [hKalman,hLh,hX,hY,hZ,rotor_arrows',h_obs_f,h_obs_r], ...
     {'Kalman','Lighthouse','Axe X','Axe Y','Axe Z', ...
-     'Motor 1','Motor 2','Motor 3','Motor 4'}, ...
+     'Motor 1','Motor 2','Motor 3','Motor 4', ...
+     'Obstáculo Inferior','Techo'}, ...
     'TextColor','w','Location','northwest');
+
 
 % === 11) Animación ===
 for i = 1:n-1
     % Trayectorias
     addpoints(hKalman, x_k(i), y_k(i), z_k(i));
     addpoints(hLh,     x_lh(i), y_lh(i), z_lh(i));
+    
 
     % Rotación cuerpo→mundo y patch
     R = eul2rotm([yaw(i),pitch(i),roll(i)],'ZYX');
@@ -106,6 +123,23 @@ for i = 1:n-1
             'UData',scale_ref*dir(1,2),'VData',scale_ref*dir(2,2),'WData',scale_ref*dir(3,2));
     set(hZ, 'XData',x_k(i),'YData',y_k(i),'ZData',z_k(i), ...
             'UData',scale_ref*dir(1,3),'VData',scale_ref*dir(2,3),'WData',scale_ref*dir(3,3));
+   
+    % === SLAM: acumular puntos estimados para f y r ===
+    xf = x_k(i);  yf = y_k(i);
+
+    obs_f_X(end+1) = xf;
+    obs_f_Y(end+1) = yf;
+    obs_f_Z(end+1) = f_val(i);
+
+    obs_r_X(end+1) = xf;
+    obs_r_Y(end+1) = yf;
+    obs_r_Z(end+1) = r_val(i);
+
+    set(h_obs_f, 'XData', obs_f_X, 'YData', obs_f_Y, 'ZData', obs_f_Z);
+    set(h_obs_r, 'XData', obs_r_X, 'YData', obs_r_Y, 'ZData', obs_r_Z);
+
+
+
 
     % Motores: longitud proporcional al PWM normalizado
    for k = 1:4
