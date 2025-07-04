@@ -2,6 +2,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import os
 
 import cflib.crtp
 from cflib.crazyflie import Crazyflie
@@ -118,13 +119,19 @@ if __name__ == '__main__':
     while lh_method not in ['0', '1']:
         lh_method = input("Entrée non validée. Écrivez 0 (Crossing Beams) o 1 (Sweep Angle): ")
     lh_method = int(lh_method)
-    
+
+    use_correction = input("Vous voulez utiliser kalman.useFAndR? (1 = Oui, 0 = Non): ")
+    while use_correction not in ['0', '1']:
+        use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
+    use_correction = int(use_correction)
+
     cflib.crtp.init_drivers()
     arm_dron()
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         scf.cf.param.set_value('stabilizer.estimator', '2')
         #scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
+        scf.cf.param.set_value('kalman.useFAndR', str(use_correction))
         scf.cf.param.set_value('lighthouse.method', str(lh_method))
         reset_estimator(scf.cf)
 
@@ -153,7 +160,7 @@ if __name__ == '__main__':
         logconf_kalman.start()
 
         # Kalman extra: SOLO F/R/Z (intenta añadirlas y arranca si alguna existe)
-        """logconf_kf_extra = LogConfig(name='KalmanF', period_in_ms=20)
+        logconf_kf_extra = LogConfig(name='KalmanF', period_in_ms=20)
         for var in ['kalman.stateF', 'kalman.stateR', 'kalman.stateZ']:
             try:
                 logconf_kf_extra.add_variable(var, 'float')
@@ -163,7 +170,7 @@ if __name__ == '__main__':
             scf.cf.log.add_config(logconf_kf_extra)
             logconf_kf_extra.data_received_cb.add_callback(kalman_extra_callback)
             logconf_kf_extra.start()
-        """
+        
         # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
         for var in ['lighthouse.x', 'lighthouse.y', 'lighthouse.z']:
@@ -194,12 +201,12 @@ if __name__ == '__main__':
         lc_mot.start()
 
         # --- Log Motors_rpm ---
-        lc_mot = LogConfig('Motors_rpm', period_in_ms=20)
+        lc_mot_rpm = LogConfig('Motors_rpm', period_in_ms=20)
         for v in ['rpm.m1','rpm.m2','rpm.m3','rpm.m4']:
-            lc_mot.add_variable(v,'uint16_t')
-        scf.cf.log.add_config(lc_mot)
-        lc_mot.data_received_cb.add_callback(motor_rpm_callback)
-        lc_mot.start()
+            lc_mot_rpm.add_variable(v,'uint16_t')
+        scf.cf.log.add_config(lc_mot_rpm)
+        lc_mot_rpm.data_received_cb.add_callback(motor_rpm_callback)
+        lc_mot_rpm.start()
 
         # --- Log Controller ---
         lc_st = LogConfig('Controller', period_in_ms=20)
@@ -212,11 +219,11 @@ if __name__ == '__main__':
         # Trajectoire souhaitée
         trajectory = [
             (0, 0, 0.5, 3),
-            (0.5, 0, 0.5, 4),
-            (0.5, 0.5, 0.5, 4),
-            (0, 0.5, 0.5, 4),
-            (0, 0, 0.5, 4),
-            (0, 0, 0, 1)
+            (1.5, 0, 0.5, 4),
+            (1.5, 1, 0.5, 4),
+            (0, 1, 0.5, 4),
+            (0, -0.5, 0.5, 4),
+            (0, -0.5, 0, 1)
         ]
 
         # Ejecutar vuelo
@@ -250,33 +257,80 @@ if __name__ == '__main__':
     else:
         print("❌ Multi-ranger deck pas détecté")
 
-    # Exportar a CSV
-    df = pd.DataFrame({
-        'time': kalman_data['time'],
-        'x_kalman': kalman_data['x'],
-        'y_kalman': kalman_data['y'],
-        'z_kalman': kalman_data['z'],
-        'x_lh': lighthouse_data['x'],
-        'y_lh': lighthouse_data['y'],
-        'z_lh': lighthouse_data['z'],
-        'roll': kalman_data['roll'],
-        'pitch': kalman_data['pitch'],
-        'yaw': kalman_data['yaw'],
-        #'F': kalman_data['F'],
-        #'R': kalman_data['R'],
-        #'Z': kalman_data['Z'],
-        'motor.m1':          motor_data['m1'],
-        'motor.m2':          motor_data['m2'],
-        'motor.m3':          motor_data['m3'],
-        'motor.m4':          motor_data['m4'],
-        'rpm.m1':          motor_data_rpm['m1_rpm'],
-        'rpm.m2':          motor_data_rpm['m2_rpm'],
-        'rpm.m3':          motor_data_rpm['m3_rpm'],
-        'rpm.m4':          motor_data_rpm['m4_rpm'],
-        'controller.cmd_thrust': stab_data['thrust'],
-        'controller.cmd_roll':   stab_data['roll'],
-        'controller.cmd_pitch':  stab_data['pitch'],
-        'controller.cmd_yaw':    stab_data['yaw'],
-    })
-    df.to_csv("vuelo_datos.csv", index=False)
-    print("Donnés exportés à vuelo_datos.csv")
+    # [Todo el código anterior permanece igual hasta la sección de exportación CSV...]
+
+# =============================================
+# CORRECCIÓN PARA EXPORTAR CSV CON LONGITUDES IGUALES
+# =============================================
+
+# Encontramos la longitud mínima común entre todos los datasets
+min_length = min(
+    len(kalman_data['time']),
+    len(lighthouse_data['x']),
+    len(motor_data['m1']),
+    len(motor_data_rpm['m1_rpm']),
+    len(stab_data['thrust'])
+)
+
+# Función para recortar todas las listas a la longitud mínima
+def trim_data(data_dict, length):
+    for key in data_dict:
+        data_dict[key] = data_dict[key][:length]
+
+# Aplicamos a todos los conjuntos de datos
+trim_data(kalman_data, min_length)
+trim_data(lighthouse_data, min_length)
+trim_data(motor_data, min_length)
+trim_data(motor_data_rpm, min_length)
+trim_data(stab_data, min_length)
+
+# Verificación final de longitudes (opcional)
+print("\n=== Longitudes después del ajuste ===")
+print(f"Kalman: {len(kalman_data['time'])}")
+print(f"Lighthouse: {len(lighthouse_data['x'])}")
+print(f"Motores: {len(motor_data['m1'])}")
+print(f"RPM: {len(motor_data_rpm['m1_rpm'])}")
+print(f"Controlador: {len(stab_data['thrust'])}")
+
+# Generar nombre automático para el archivo de salida
+def get_next_filename(base_name="vuelo_datos", ext="csv"):
+    i = 1
+    while os.path.exists(f"{base_name}{i}.{ext}"):
+        i += 1
+    return f"{base_name}{i}.{ext}"
+
+output_filename = get_next_filename()
+
+
+# Creación del DataFrame con datos sincronizados
+df = pd.DataFrame({
+    'time': kalman_data['time'],
+    'x_kalman': kalman_data['x'],
+    'y_kalman': kalman_data['y'],
+    'z_kalman': kalman_data['z'],
+    'x_lh': lighthouse_data['x'],
+    'y_lh': lighthouse_data['y'],
+    'z_lh': lighthouse_data['z'],
+    'roll': kalman_data['roll'],
+    'pitch': kalman_data['pitch'],
+    'yaw': kalman_data['yaw'],
+    'F': kalman_data['F'],
+    'R': kalman_data['R'],
+    'Z': kalman_data['Z'],
+    'motor.m1': motor_data['m1'],
+    'motor.m2': motor_data['m2'],
+    'motor.m3': motor_data['m3'],
+    'motor.m4': motor_data['m4'],
+    'rpm.m1': motor_data_rpm['m1_rpm'],
+    'rpm.m2': motor_data_rpm['m2_rpm'],
+    'rpm.m3': motor_data_rpm['m3_rpm'],
+    'rpm.m4': motor_data_rpm['m4_rpm'],
+    'controller.cmd_thrust': stab_data['thrust'],
+    'controller.cmd_roll': stab_data['roll'],
+    'controller.cmd_pitch': stab_data['pitch'],
+    'controller.cmd_yaw': stab_data['yaw'],
+})
+
+# Exportar a CSV
+df.to_csv(output_filename, index=False)
+print(f"\n✅ Datos exportados correctamente a {output_filename} (muestras: {min_length})")
