@@ -236,18 +236,26 @@ if __name__ == '__main__':
 
         # Trajectoire souhaitée
         trajectory = [
-            (0, 0, 0.55, 3),
-            (1.5, 0, 0.55, 4),
-            (1.5, 1, 0.55, 4),
-            (-0.5, 1, 0.55, 4),
-            (-0.5, 0, 0.55, 4),
-            (-0.5, 0, 0, 1)
+            #(0, 0, 0, 1),
+            #(0, 0, 1.5, 3),
+            #(1.5, 0, 1.5, 4),
+            #(1.5, 0, 1.5, 4),
+            #(0, 0, 1.5, 4),
+            #(-0.5, 0, 1.5, 4),
+            #(-0.5, 0, 0, 2)
+            (0, 0, 0, 1),
+            (0, 0, 0.5, 3),
+            (1.5, 0, 0.5, 4),
+            (1.5, 0, 1, 4),
+            (0, 0, 1, 4),
+            (-0.5, 0, 1, 4),
+            (-0.5, 0, 0, 2)
         ]
 
         for i in range(len(trajectory) - 1):
             start = trajectory[i][:3]
             end = trajectory[i+1][:3]
-            send_position_limited_speed(scf.cf, start, end, max_speed=0.7, dt=0.1)
+            send_position_limited_speed(scf.cf, start, end, max_speed=0.5, dt=0.1)
 
         logconf_kalman.stop()
         if 'logconf_kf_extra' in locals():
