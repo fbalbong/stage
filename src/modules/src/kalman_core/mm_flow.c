@@ -156,7 +156,7 @@ void kalmanCoreUpdateWithFlowUsingF(kalmanCoreData_t* this, const flowMeasuremen
   float hy[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 Hy = {1, KC_STATE_DIM, hy};
   predictedNY = (flow->dt * Npix / thetapix ) * ((dy_g * this->R[2][2] / z_g) + omegax_b);
-  measuredNY = flow->dpixely;
+  measuredNY = flow->dpixely*FLOW_RESOLUTION;
 
   // derive measurement equation with respect to dy (not z and f since it caused some bad behaviour)
   hy[KC_STATE_PY] = (Npix * flow->dt / thetapix) * (this->R[2][2] / z_g);

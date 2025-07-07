@@ -5,7 +5,7 @@ gm = fegeometry("drone.stl");
 pdegplot(gm,FaceLabels="on",FaceAlpha=0.3)
 
 % === 1) Leer CSV ===
-data = readtable('vuelo_datos11.csv');
+data = readtable('vuelo_datos12.csv');
 x_k = data.x_kalman;   y_k = data.y_kalman;   z_k = data.z_kalman;
 x_lh = data.x_lh;      y_lh = data.y_lh;      z_lh = data.z_lh;
 roll  = deg2rad(data.roll);    pitch = deg2rad(data.pitch);    yaw = deg2rad(data.yaw);

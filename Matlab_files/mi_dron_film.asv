@@ -5,7 +5,7 @@ gm = fegeometry("drone.stl");
 pdegplot(gm,FaceLabels="on",FaceAlpha=0.3)
 
 % === 1) Leer CSV ===
-data = readtable('vuelo_datos6.csv');
+data = readtable('vuelo_datos12.csv');
 x_k = data.x_kalman;   y_k = data.y_kalman;   z_k = data.z_kalman;
 x_lh = data.x_lh;      y_lh = data.y_lh;      z_lh = data.z_lh;
 roll  = deg2rad(data.roll);    pitch = deg2rad(data.pitch);    yaw = deg2rad(data.yaw);
@@ -44,20 +44,22 @@ end
 % === 5) Figura ===
 fig = figure('Color',[0.05 0.05 0.05],...
              'Units','normalized','OuterPosition',[0 0 1 1]);
-ax = axes('Parent',fig); axis equal; hold(ax,'on'); grid(ax,'on');
+ax = axes('Parent',fig); axis normal; hold(ax,'on'); grid(ax,'on');
 set(ax,'XColor','w','YColor','w','ZColor','w','Color',[0.05 0.05 0.05]);
 xlabel(ax,'X (m)','Color','w');   ylabel(ax,'Y (m)','Color','w');   zlabel(ax,'Z (m)','Color','w');
 title(ax,'Crazyflie 2.1 – Trayectoria & Motores','Color','w');
 m = 0.05;
 xlim([min([x_k;x_lh])-m, max([x_k;x_lh])+m]);
 ylim([min([y_k;y_lh])-m, max([y_k;y_lh])+m]);
-zlim([min([z_k;z_lh])-m, max([z_k;z_lh])+m]);
+zlim([min([f_val;z_k;z_lh])-m, max([r_val;z_k;z_lh])+m]);
+% pbaspect(ax, [4 4 1]);
+% pbaspect auto;
 
 light('Parent',ax,'Position',[1 1 5],'Style','infinite');
 material(ax,'dull');
 
 % === 6) Trayectorias ===
-hKalman = animatedline(ax,'Color',[0.2 0.6 1],'LineWidth',2,'DisplayName','Kalman');
+hKalman = animatedline(ax,'Color',[0.4 0.8 0.8],'LineWidth',2,'DisplayName','Kalman');
 hLh     = animatedline(ax,'Color',[1 0.4 0.4],'LineStyle','--','LineWidth',2,'DisplayName','Lighthouse');
 
 % === 7) Dron STL ===
@@ -90,7 +92,7 @@ end
 obs_f_X = []; obs_f_Y = []; obs_f_Z = [];
 obs_r_X = []; obs_r_Y = []; obs_r_Z = [];
 
-h_obs_f = scatter3(ax, [], [], [], 10, [1, 0.5, 0], 'filled', 'DisplayName','Obstáculo Inferior');
+h_obs_f = scatter3(ax, [], [], [], 10, [1, 0.5, 0], 'filled', 'DisplayName','Obstáculo Inferior','MarkerFaceColor','flat');
 h_obs_r = scatter3(ax, [], [], [], 10, [0.4, 0.6, 1], 'filled', 'DisplayName','Techo');
 
 
@@ -151,7 +153,7 @@ for i = 1:n-1
     end
 
     % Suave rotación de cámara
-    az = 30 + 0.25*i;
+    az =  0.25*i;
     view(ax,az,20);
 
     drawnow;
