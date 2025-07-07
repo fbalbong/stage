@@ -5,7 +5,7 @@ gm = fegeometry("drone.stl");
 pdegplot(gm,FaceLabels="on",FaceAlpha=0.3)
 
 % === 1) Leer CSV ===
-data = readtable('vuelo_datos6.csv');
+data = readtable('vuelo_datos12.csv');
 x_k = data.x_kalman;   y_k = data.y_kalman;   z_k = data.z_kalman;
 x_lh = data.x_lh;      y_lh = data.y_lh;      z_lh = data.z_lh;
 roll  = deg2rad(data.roll);    pitch = deg2rad(data.pitch);    yaw = deg2rad(data.yaw);
@@ -59,7 +59,7 @@ light('Parent',ax,'Position',[1 1 5],'Style','infinite');
 material(ax,'dull');
 
 % === 6) Trayectorias ===
-hKalman = animatedline(ax,'Color',[0.4 0.6 1],'LineWidth',2,'DisplayName','Kalman');
+hKalman = animatedline(ax,'Color',[0.4 0.8 0.8],'LineWidth',2,'DisplayName','Kalman');
 hLh     = animatedline(ax,'Color',[1 0.4 0.4],'LineStyle','--','LineWidth',2,'DisplayName','Lighthouse');
 
 % === 7) Dron STL ===
@@ -153,7 +153,7 @@ for i = 1:n-1
     end
 
     % Suave rotación de cámara
-    az = 30 + 0.25*i;
+    az =  0.25*i;
     view(ax,az,20);
 
     drawnow;
