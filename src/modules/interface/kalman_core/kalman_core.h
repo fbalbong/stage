@@ -60,7 +60,7 @@
 // Indexes to access the quad's state, stored as a column vector
 typedef enum
 {
-  KC_STATE_X, KC_STATE_Y, KC_STATE_Z, KC_STATE_PX, KC_STATE_PY, KC_STATE_PZ, KC_STATE_D0, KC_STATE_D1, KC_STATE_D2, KC_STATE_F, KC_STATE_R, KC_STATE_DIM
+  KC_STATE_X, KC_STATE_Y, KC_STATE_Z, KC_STATE_PX, KC_STATE_PY, KC_STATE_PZ, KC_STATE_D0, KC_STATE_D1, KC_STATE_D2, KC_STATE_F, KC_STATE_R, KC_STATE_B, KC_STATE_C, KC_STATE_S, KC_STATE_T, KC_STATE_DIM,
 } kalmanCoreStateIdx_t;
 
 
@@ -75,6 +75,10 @@ typedef struct {
    * - D0, D1, D2: attitude error
    * - F: estimated distance from the starting z position to what is below the CF
    * - R: estimated distance from the starting z position to the current roof above the CF 
+   * - B: estimated distance from the starting x position to what is back of the CF
+   * - C: estimated distance from the starting x position to the current wall on front of the CF
+   * - S: estimated distance from the starting y position to what is right of the CF
+   * - T: estimated distance from the starting y position to the current wall on left of the CF
    * For more information, refer to the paper
    */
   float S[KC_STATE_DIM];
@@ -103,6 +107,9 @@ typedef struct {
   uint32_t lastProcessNoiseUpdateMs;
 
   bool stateRInitialized; // Flag to signal if R has been initialized
+  bool stateCInitialized; // Flag to signal if C has been initialized
+  bool stateTInitialized; // Flag to signal if T has been initialized
+
 } kalmanCoreData_t;
 
 // The parameters used by the filter

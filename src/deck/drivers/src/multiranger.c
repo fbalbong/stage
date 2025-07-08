@@ -162,7 +162,29 @@ static void mrTask(void *param)
         float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
         rangeEnqueueUpRangeInEstimator(distance, stdDev, xTaskGetTickCount());
     }
+    if (rawFront < RANGE_UP_OUTLIER_LIMIT) {
+        float distance = (float)rawFront * 0.001f;
+        float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
+        rangeEnqueueFrontRangeInEstimator(distance, stdDev, xTaskGetTickCount());
     }
+    if (rawBack < RANGE_UP_OUTLIER_LIMIT) {
+        float distance = (float)rawBack * 0.001f;
+        float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
+        rangeEnqueueBackRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+    }
+    if (rawLeft < RANGE_UP_OUTLIER_LIMIT) {
+        float distance = (float)rawLeft * 0.001f;
+        float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
+        rangeEnqueueLeftRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+    }
+    if (rawRight < RANGE_UP_OUTLIER_LIMIT) {
+        float distance = (float)rawRight * 0.001f;
+        float stdDev = expStdA * (1.0f  + expf( expCoeff * (distance - expPointA)));
+        rangeEnqueueRightRangeInEstimator(distance, stdDev, xTaskGetTickCount());
+    }
+    }
+    
+    
 
 }
 

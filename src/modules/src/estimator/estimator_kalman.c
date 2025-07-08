@@ -127,6 +127,9 @@ static bool robustTdoa = false;
 // Nonzero to take advantage of the extended state (F and R) to get a better estimate of Z
 static bool useFAndR = true;
 
+// Nonzero to take advantage of the extended state (B, C, S, T) to get a better estimate of X and Y
+static bool useBAndCAndSAndT = true;
+
 /**
  * Quadrocopter State
  *
@@ -136,6 +139,10 @@ static bool useFAndR = true;
  * - D0, D1, D2: attitude error
  * - F: estimated distance from the starting z position to what is below the CF
  * - R: estimated distance from the starting z position to the current roof above the CF 
+ * - B: estimated distance from the starting x position to what is back of the CF
+ * - C: estimated distance from the starting x position to the current wall on front of the CF
+ * - S: estimated distance from the starting y position to what is right of the CF
+ * - T: estimated distance from the starting y position to the current wall on left of the CF
  * For more information, refer to the paper
  */
 
@@ -342,6 +349,30 @@ static void updateQueuedMeasurements(const uint32_t nowMs, const bool quadIsFlyi
           kalmanCoreUpdateWithUpTofUsingR(&coreData, &m.data.tof);
         }
         break;
+      case MeasurementTypeFrontTOF:
+        if(useBAndCAndSAndT){ 
+          // Tof update using the front range measurement and the estimated distance to the front wall (C)
+          kalmanCoreUpdateWithFrontTofUsingC(&coreData, &m.data.fronttof);
+        }
+        break;
+      case MeasurementTypeBackTOF:
+        if(useBAndCAndSAndT){
+          // Tof update using the back range measurement and the estimated distance to the back wall (B)
+          kalmanCoreUpdateWithBackTofUsingB(&coreData, &m.data.backtof);
+        }
+        break;
+      case MeasurementTypeLeftTOF:
+        if(useBAndCAndSAndT){
+          // Tof update using the left range measurement and the estimated distance to the left wall (  T)
+          kalmanCoreUpdateWithLeftTofUsingT(&coreData, &m.data.lefttof);
+        }
+        break;
+      case MeasurementTypeRightTOF:
+        if(useBAndCAndSAndT){
+          // Tof update using the right range measurement and the estimated distance to the right wall (S)
+          kalmanCoreUpdateWithRightTofUsingS(&coreData, &m.data.righttof);
+        }
+        break;
       case MeasurementTypeAbsoluteHeight:
         kalmanCoreUpdateWithAbsoluteHeight(&coreData, &m.data.height);
         break;
@@ -473,6 +504,22 @@ LOG_GROUP_START(kalman)
   */  
   LOG_ADD(LOG_FLOAT, stateR, &coreData.S[KC_STATE_R])
   /**
+  * @brief Estimated back wall distance compared to the reference point where X = 0
+  */
+  LOG_ADD(LOG_FLOAT, stateB, &coreData.S[KC_STATE_B])
+  /**
+  * @brief Estimated front wall distance compared to the reference point where X = 0
+  */
+  LOG_ADD(LOG_FLOAT, stateC, &coreData.S[KC_STATE_C])
+  /**
+  * @brief Estimated right wall distance compared to the reference point where Y = 0
+  */
+  LOG_ADD(LOG_FLOAT, stateS, &coreData.S[KC_STATE_S])
+  /**
+  * @brief Estimated left wall distance compared to the reference point where Y = 0
+  */
+  LOG_ADD(LOG_FLOAT, stateT, &coreData.S[KC_STATE_T])
+  /**
   * @brief Covariance matrix position x
   */
   LOG_ADD(LOG_FLOAT, varX, &coreData.P[KC_STATE_X][KC_STATE_X])
@@ -571,6 +618,10 @@ PARAM_GROUP_START(kalman)
  * @brief Nonzero to use F (floor height) and R (roof height) in the estimation for a better Z estimate
  */
   PARAM_ADD_CORE(PARAM_UINT8, useFAndR, &useFAndR)
+/**
+ * @brief Nonzero to use B (back wall), C (front wall), S (right wall) and T (left wall) in the estimation for a better X and Y estimate
+ */
+  PARAM_ADD_CORE(PARAM_UINT8, useBAndCAndSAndT, &useBAndCAndSAndT)
 /**
  * @brief Process noise for x and y acceleration
  */

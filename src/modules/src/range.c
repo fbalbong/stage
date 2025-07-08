@@ -63,6 +63,34 @@ void rangeEnqueueUpRangeInEstimator(float distance, float stdDev, uint32_t timeS
   tofData.stdDev = stdDev;
   estimatorEnqueueUpTOF(&tofData);
 }
+void rangeEnqueueFrontRangeInEstimator(float distance, float stdDev, uint32_t timeStamp) {
+  tofMeasurement_t tofData;
+  tofData.timestamp = timeStamp;
+  tofData.distance = distance;
+  tofData.stdDev = stdDev;
+  estimatorEnqueueFrontTOF(&tofData);
+}
+void rangeEnqueueBackRangeInEstimator(float distance, float stdDev, uint32_t timeStamp) {
+  tofMeasurement_t tofData;
+  tofData.timestamp = timeStamp;
+  tofData.distance = distance;
+  tofData.stdDev = stdDev;
+  estimatorEnqueueBackTOF(&tofData);
+}
+void rangeEnqueueLeftRangeInEstimator(float distance, float stdDev, uint32_t timeStamp) {
+  tofMeasurement_t tofData;
+  tofData.timestamp = timeStamp;
+  tofData.distance = distance;
+  tofData.stdDev = stdDev;
+  estimatorEnqueueLeftTOF(&tofData);
+}
+void rangeEnqueueRightRangeInEstimator(float distance, float stdDev, uint32_t timeStamp) {
+  tofMeasurement_t tofData;
+  tofData.timestamp = timeStamp;
+  tofData.distance = distance;
+  tofData.stdDev = stdDev;
+  estimatorEnqueueRightTOF(&tofData);
+}
 
 /**
  * Log group for the multi ranger and Z-ranger decks

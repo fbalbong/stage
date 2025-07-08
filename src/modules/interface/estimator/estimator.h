@@ -50,6 +50,10 @@ typedef enum {
   MeasurementTypeDistance,
   MeasurementTypeTOF,
   MeasurementTypeUpTOF,
+  MeasurementTypeFrontTOF,
+  MeasurementTypeBackTOF,
+  MeasurementTypeLeftTOF,
+  MeasurementTypeRightTOF,
   MeasurementTypeAbsoluteHeight,
   MeasurementTypeFlow,
   MeasurementTypeYawError,
@@ -70,6 +74,10 @@ typedef struct
     distanceMeasurement_t distance;
     tofMeasurement_t tof;
     tofMeasurement_t uptof;
+    tofMeasurement_t fronttof;
+    tofMeasurement_t backtof;
+    tofMeasurement_t lefttof;
+    tofMeasurement_t righttof;
     heightMeasurement_t height;
     flowMeasurement_t flow;
     yawErrorMeasurement_t yawError;
@@ -136,6 +144,38 @@ static inline void estimatorEnqueueUpTOF(const tofMeasurement_t *tof)
   measurement_t m;
   m.type = MeasurementTypeUpTOF;
   m.data.uptof = *tof;
+  estimatorEnqueue(&m);
+}
+
+static inline void estimatorEnqueueFrontTOF(const tofMeasurement_t *tof)
+{
+  measurement_t m;
+  m.type = MeasurementTypeFrontTOF;
+  m.data.fronttof = *tof;
+  estimatorEnqueue(&m);
+}
+
+static inline void estimatorEnqueueBackTOF(const tofMeasurement_t *tof)
+{
+  measurement_t m;
+  m.type = MeasurementTypeBackTOF;
+  m.data.backtof = *tof;
+  estimatorEnqueue(&m);
+}
+
+static inline void estimatorEnqueueLeftTOF(const tofMeasurement_t *tof)
+{
+  measurement_t m;
+  m.type = MeasurementTypeLeftTOF;
+  m.data.lefttof = *tof;
+  estimatorEnqueue(&m);
+}
+
+static inline void estimatorEnqueueRightTOF(const tofMeasurement_t *tof)
+{
+  measurement_t m;
+  m.type = MeasurementTypeRightTOF;
+  m.data.righttof = *tof;
   estimatorEnqueue(&m);
 }
 

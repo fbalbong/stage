@@ -126,10 +126,25 @@ static void assertStateNotNaN(const kalmanCoreData_t* this)
 // Initial things from changes multiranger deck
 static const float stdDevInitialF = 0; // initialF is almost true by definition 
 static const float stdDevInitialR = 0;
+static const float stdDevInitialB = 0; 
+static const float stdDevInitialC = 0; 
+static const float stdDevInitialS = 0; 
+static const float stdDevInitialT = 0; 
+
 static float procNoiseF = 0; // This could be tuned to some other value, but it seems natural for it to be 0
-static float procNoiseR = 0; // This could be tuned to some other value, but it seems natural for it to be 0
+static float procNoiseR = 0; 
+static float procNoiseB = 0; 
+static float procNoiseC = 0; 
+static float procNoiseS = 0; 
+static float procNoiseT = 0;
+// Initial values for the extended state (F, R, B, C, S, T)
 static float initialF = 0.0;
 static float initialR = -1.0; // It does not matter since it is overwritten on the first range up measurement (as long as stateRInitialized is set to false).
+static float initialB = 0.0; 
+static float initialC = 0.0;
+static float initialS = 0.0;
+static float initialT = 0.0;
+
 
 void kalmanCoreDefaultParams(kalmanCoreParams_t* params)
 {
@@ -176,9 +191,15 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, co
 //  this->S[KC_STATE_D1] = 0;
 //  this->S[KC_STATE_D2] = 0;
   this->S[KC_STATE_F] = initialF; 
-  this->S[KC_STATE_R] = initialR; 
+  this->S[KC_STATE_R] = initialR;
+  this->S[KC_STATE_B] = initialB;
+  this->S[KC_STATE_C] = initialC;
+  this->S[KC_STATE_S] = initialS;
+  this->S[KC_STATE_T] = initialT; 
   // The stateRInitialized is set to false, so that the first range up measurement will set the initial value.
   this->stateRInitialized = false; 
+  this->stateCInitialized = false; 
+  this->stateTInitialized = false; 
 
 
   // reset the attitude quaternion
@@ -214,6 +235,11 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, co
 
   this->P[KC_STATE_F][KC_STATE_F] = powf(stdDevInitialF, 2);
   this->P[KC_STATE_R][KC_STATE_R] = powf(stdDevInitialR, 2);
+
+  this->P[KC_STATE_B][KC_STATE_B] = powf(stdDevInitialB, 2);
+  this->P[KC_STATE_C][KC_STATE_C] = powf(stdDevInitialC, 2);
+  this->P[KC_STATE_S][KC_STATE_S] = powf(stdDevInitialS, 2);
+  this->P[KC_STATE_T][KC_STATE_T] = powf(stdDevInitialT, 2);
 
   this->Pm.numRows = KC_STATE_DIM;
   this->Pm.numCols = KC_STATE_DIM;
@@ -402,7 +428,12 @@ static void predictDt(kalmanCoreData_t* this, Axis3f *acc, Axis3f *gyro, float d
   A[KC_STATE_D2][KC_STATE_D2] = 1;
 
   A[KC_STATE_F][KC_STATE_F] = 1;
-  A[KC_STATE_R][KC_STATE_R] = 1; 
+  A[KC_STATE_R][KC_STATE_R] = 1;
+
+  A[KC_STATE_B][KC_STATE_B] = 1;
+  A[KC_STATE_C][KC_STATE_C] = 1;
+  A[KC_STATE_S][KC_STATE_S] = 1;
+  A[KC_STATE_T][KC_STATE_T] = 1;
 
   // position from body-frame velocity
   A[KC_STATE_X][KC_STATE_PX] = this->R[0][0]*dt;
@@ -615,6 +646,12 @@ static void addProcessNoiseDt(kalmanCoreData_t *this, const kalmanCoreParams_t *
   this->P[KC_STATE_F][KC_STATE_F] += powf(procNoiseF, 2);
   this->P[KC_STATE_R][KC_STATE_R] += powf(procNoiseR, 2);
 
+  this->P[KC_STATE_B][KC_STATE_B] += powf(procNoiseB, 2);
+  this->P[KC_STATE_C][KC_STATE_C] += powf(procNoiseC, 2);
+  this->P[KC_STATE_S][KC_STATE_S] += powf(procNoiseS, 2);
+  this->P[KC_STATE_T][KC_STATE_T] += powf(procNoiseT, 2);
+
+
   for (int i=0; i<KC_STATE_DIM; i++) {
     for (int j=i; j<KC_STATE_DIM; j++) {
       float p = 0.5f*this->P[i][j] + 0.5f*this->P[j][i];
@@ -709,6 +746,11 @@ bool kalmanCoreFinalize(kalmanCoreData_t* this)
 
     A[KC_STATE_F][KC_STATE_F] = 1;
     A[KC_STATE_R][KC_STATE_R] = 1;
+
+    A[KC_STATE_B][KC_STATE_B] = 1;
+    A[KC_STATE_C][KC_STATE_C] = 1;
+    A[KC_STATE_S][KC_STATE_S] = 1;
+    A[KC_STATE_T][KC_STATE_T] = 1;
 
     A[KC_STATE_D0][KC_STATE_D0] =  1 - d1*d1/2 - d2*d2/2;
     A[KC_STATE_D0][KC_STATE_D1] =  d2 + d0*d1/2;
@@ -854,4 +896,19 @@ PARAM_GROUP_START(kalman)
  * @brief Initial R (roof height) after reset [m] (does not really matter since the first range up measurement after reset is used to initialize)
  */
   PARAM_ADD_CORE(PARAM_FLOAT, initialR, &initialR)
+/**
+ * @brief initial B (back offset) after reset [m]
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialB, &initialB)
+/**
+ * @brief initial C (front offset) after reset [m]
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialC, &initialC)
+/** 
+ * @brief initial S (side offset) after reset [m]
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialS, &initialS)
+/** * @brief initial T (top offset) after reset [m]
+ */
+  PARAM_ADD_CORE(PARAM_FLOAT, initialT, &initialT)
 PARAM_GROUP_STOP(kalman)

@@ -70,3 +70,41 @@ void rangeEnqueueDownRangeInEstimator(float distance, float stdDev, uint32_t tim
  * @param timeStamp The time when the range was sampled (in sys ticks)
  */
 void rangeEnqueueUpRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+
+/**
+ * Enqueue a front range measurement for distance to the front wall in the current estimator.
+ *
+ * @param distance Distance to the front wall (m)
+ * @param stdDev The standard deviation of the range sample
+ * @param timeStamp The time when the range was sampled (in sys ticks)
+ */
+void rangeEnqueueFrontRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+
+/**
+ * Enqueue a back range measurement for distance to the back wall in the current estimator.
+ *
+ * @param distance Distance to the back wall (m)
+ * @param stdDev The standard deviation of the range sample
+ * @param timeStamp The time when the range was sampled (in sys ticks)
+ */
+void rangeEnqueueBackRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+
+/**
+ * Enqueue a left range measurement for distance to the left wall in the current estimator.
+ *
+ * @param distance Distance to the left wall (m)
+ * @param stdDev The standard deviation of the range sample
+ * @param timeStamp The time when the range was sampled (in sys ticks)
+ */
+void rangeEnqueueLeftRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);
+
+/**
+ * Enqueue a right range measurement for distance to the right wall in the current estimator.
+ *
+ * @param distance Distance to the right wall (m)
+ * @param stdDev The standard deviation of the range sample
+ * @param timeStamp The time when the range was sampled (in sys ticks)
+ */
+void rangeEnqueueRightRangeInEstimator(float distance, float stdDev, uint32_t timeStamp);  
+
+
