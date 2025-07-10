@@ -223,7 +223,7 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[0][0] -> 0)
   if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
-    float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
+    float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
@@ -358,7 +358,7 @@ PARAM_GROUP_START(kalman)
  /**
  * @brief The variance used in the covariance matrix when a detection happenes
  */
-  PARAM_ADD_CORE(PARAM_FLOAT, varianceAfterDetection, &variance_after_detection)
+  //PARAM_ADD_CORE(PARAM_FLOAT, varianceAfterDetection, &variance_after_detection)
  /**
  * @brief Non zero to use detection in Tof measurements for changes in F or R
  */
