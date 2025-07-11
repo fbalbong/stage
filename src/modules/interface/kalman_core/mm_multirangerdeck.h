@@ -27,8 +27,14 @@
 
 #include "kalman_core.h"
 
-// Measurements of TOF from laser sensor
-void kalmanCoreUpdateWithTof(kalmanCoreData_t* this, tofMeasurement_t *tof);
+// Kalman update using the TOF from backward laser sensor and B (back wall estimate)
+void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t *tof);
 
-// Kalman update using the TOF from downward laser sensor and F (floor height estimate)
-void kalmanCoreUpdateWithTofUsingF(kalmanCoreData_t* this, tofMeasurement_t *tof);
+// Kalman update using the TOF from front laser sensor and C (front wall estimate)
+void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t *tof);
+
+// Kalman update using the TOF from right laser sensor and S (right wall estimate)
+void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t *tof);
+
+// Kalman update using the TOF from left laser sensor and T (left wall estimate)
+void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t *tof);
