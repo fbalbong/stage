@@ -200,6 +200,8 @@ void kalmanCoreInit(kalmanCoreData_t *this, const kalmanCoreParams_t *params, co
   this->stateRInitialized = false; 
   this->stateCInitialized = false; 
   this->stateTInitialized = false; 
+  this->stateBInitialized = false;
+  this->stateSInitialized = false;
 
 
   // reset the attitude quaternion

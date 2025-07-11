@@ -28,7 +28,7 @@
 
 // Parameters for tuning the detection for f and r estimation in the Tof update.
 // Factor multipled with the standard deviation of the measurement and compared to the prediction error (This is an int because of problems with param, if it is solved then it should probably be canged to a float) 
-static int detection_factor_multiranger = 10;
+static int detection_factor = 10;
 // The value the variance of f or r is set to when a detection happenes. It can probably be tuned to be smaller, but there it does not really seem to matter as long as it is "large enough"
 static float variance_after_detection = 50; 
 // Flag for turning the detection on and off. Without detection f and r tend to not change, causing the same problems as when not using them at all. There could be some way to get it to work without detection, but it is not implemented.
@@ -221,7 +221,7 @@ PARAM_GROUP_START(kalman)
 /**
  * @brief The error threshold in Tof measurements that cause a detection of step in F or R
  */
-  PARAM_ADD_CORE(PARAM_UINT8, tofDetectionFactor, &detection_factor)
+ // PARAM_ADD_CORE(PARAM_UINT8, tofDetectionFactor, &detection_factor)
  /**
  * @brief The variance used in the covariance matrix when a detection happenes
  */

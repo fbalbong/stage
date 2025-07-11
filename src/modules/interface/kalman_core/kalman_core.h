@@ -109,6 +109,8 @@ typedef struct {
   bool stateRInitialized; // Flag to signal if R has been initialized
   bool stateCInitialized; // Flag to signal if C has been initialized
   bool stateTInitialized; // Flag to signal if T has been initialized
+  bool stateBInitialized; // Flag to signal if T has been initialized
+  bool stateSInitialized; // Flag to signal if T has been initialized
 
 } kalmanCoreData_t;
 
