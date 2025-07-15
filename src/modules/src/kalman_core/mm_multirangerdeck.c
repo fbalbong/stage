@@ -28,9 +28,9 @@
 
 // Parameters for tuning the detection for f and r estimation in the Tof update.
 // Factor multipled with the standard deviation of the measurement and compared to the prediction error (This is an int because of problems with param, if it is solved then it should probably be canged to a float) 
-static int detection_factor = 10;
+static int detection_factor = 15;
 // The value the variance of f or r is set to when a detection happenes. It can probably be tuned to be smaller, but there it does not really seem to matter as long as it is "large enough"
-static float variance_after_detection = 50; 
+static float variance_after_detection = 35; 
 // Flag for turning the detection on and off. Without detection f and r tend to not change, causing the same problems as when not using them at all. There could be some way to get it to work without detection, but it is not implemented.
 static bool use_detection = true;
 
@@ -39,187 +39,148 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 1) Sacar pitch real desde R[2][0]
-  float r20  = this->R[2][0];
-  float tilt = asinf(r20);
+  // 1. Obtener componentes de inclinación vertical
+  const float r20 = this->R[2][0];
+  const float sin_alpha = fabsf(r20);
+  
+  // 2. Calcular coseno efectivo (con límite por FOV)
+  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
+  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
+  const float min_cos = cosf(HALF_FOV);
+  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
 
-  // 2) Filtrar si hay demasiado tilt
-  const float MAX_TILT = DEG_TO_RAD * 30.0f;  // ajusta a tu rango
-  if (fabsf(tilt) > MAX_TILT) {
-    return;
+  // 3. Validar confiabilidad de la medición
+  if (effective_cos < 0.1f) return;
+
+  // 4. Predicción y error (pared trasera: X_drone > B_wall)
+  const float predicted = (this->S[KC_STATE_X] - this->S[KC_STATE_B]) / effective_cos;
+  const float error = tof->distance - predicted;
+
+  // 5. Detección de outliers (reset de B)
+  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
+    this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
+    this->S[KC_STATE_B] = this->S[KC_STATE_X] - tof->distance * effective_cos;
+    return;  // Saltar actualización esta iteración
   }
 
-  // 3) Ajuste por FOV
-  const float HALF_FOV = DEG_TO_RAD * (15.0f/2.0f);
-  float angle = fabsf(tilt) - HALF_FOV;
-  if (angle < 0.0f) angle = 0.0f;
-  float cosA = cosf(angle);
+  // 6. Jacobiano
+  h[KC_STATE_X] =  1.0f / effective_cos;
+  h[KC_STATE_B] = -1.0f / effective_cos;
 
-  // 4) Predicción y error
-  float predicted = (this->S[KC_STATE_X] - this->S[KC_STATE_B]) / cosA;
-  float error     = tof->distance - predicted;
-
-  // 5) Detección de outliers
-  if (use_detection) {
-    float thr = detection_factor * tof->stdDev;
-    if (error*error > thr*thr) {
-      this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
-      this->S[KC_STATE_B] = this->S[KC_STATE_X] - tof->distance * cosA;
-      error = 0.0f;
-    }
-  }
-
-  // 6) Jacobiano coherente
-  h[KC_STATE_X] =  1.0f / cosA;
-  h[KC_STATE_B] = -1.0f / cosA;
-
-  // 7) Actualización
+  // 7. Actualización
   kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
 }
 
 void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
-  // 1) Preparar jacobiano
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 2) Extraer el pitch real desde R[2][0]
-  float r20  = this->R[2][0];
-  float tilt = asinf(r20);  // tilt en radianes
+  // 1. Obtener componentes de inclinación vertical
+  const float r20 = this->R[2][0];
+  const float sin_alpha = fabsf(r20);
+  
+  // 2. Calcular coseno efectivo
+  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
+  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
+  const float min_cos = cosf(HALF_FOV);
+  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
 
-  // 3) Filtrar si hay demasiado tilt
-  const float MAX_TILT = DEG_TO_RAD * 30.0f;  // p.ej. 30°
-  if (fabsf(tilt) > MAX_TILT) {
+  // 3. Validar confiabilidad
+  if (effective_cos < 0.1f) return;
+
+  // 4. Predicción y error (pared frontal: C_wall > X_drone)
+  const float predicted = (this->S[KC_STATE_C] - this->S[KC_STATE_X]) / effective_cos;
+  const float error = tof->distance - predicted;
+
+  // 5. Detección de outliers (reset de C)
+  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
+    this->P[KC_STATE_C][KC_STATE_C] = variance_after_detection;
+    this->S[KC_STATE_C] = this->S[KC_STATE_X] + tof->distance * effective_cos;
     return;
   }
 
-  // 4) Restar la mitad del FOV y saturar a 0
-  const float HALF_FOV = DEG_TO_RAD * (15.0f/2.0f);
-  float angle = fabsf(tilt) - HALF_FOV;
-  if (angle < 0.0f) {
-    angle = 0.0f;
-  }
-  float cosA = cosf(angle);
+  // 6. Jacobiano
+  h[KC_STATE_X] = -1.0f / effective_cos;
+  h[KC_STATE_C] =  1.0f / effective_cos;
 
-  // 5) Predicción de la distancia y cálculo de error
-  //    (estado C menos estado X, al otro sentido)
-  float predicted = (this->S[KC_STATE_C] - this->S[KC_STATE_X]) / cosA;
-  float measured  = tof->distance;
-  float error     = measured - predicted;
-
-  // 6) Detección de outliers (opcional)
-  if (use_detection) {
-    float thr = detection_factor * tof->stdDev;
-    if (error*error > thr*thr) {
-      // saltamos a una primera estimación y aumentamos la varianza
-      this->P[KC_STATE_C][KC_STATE_C] = variance_after_detection;
-      // recalibramos C de forma rápida
-      this->S[KC_STATE_C] = this->S[KC_STATE_X] + measured * cosA;
-      error = 0.0f;
-    }
-  }
-
-  // 7) Jacobiano coherente con la predicción
-  //    d(predicted)/dX = -1/cosA,  d(predicted)/dC = +1/cosA
-  h[KC_STATE_X] = -1.0f / cosA;
-  h[KC_STATE_C] =  1.0f / cosA;
-
-  // 8) Actualización escalar del Kalman
+  // 7. Actualización
   kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
 }
 
 void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
-  // 1) Preparar jacobiano
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 2) Sacar el tilt real desde R[2][1]
-  float r21  = this->R[2][1];
-  float tilt = asinf(r21);  // tilt en radianes
+  // 1. Obtener componente vertical del eje Y
+  const float r21 = this->R[2][1];
+  const float sin_alpha = fabsf(r21);
+  
+  // 2. Calcular coseno efectivo (con límite por FOV)
+  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
+  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
+  const float min_cos = cosf(HALF_FOV);
+  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
 
-  // 3) Filtrar si hay demasiado tilt (±30° por ejemplo)
-  const float MAX_TILT = DEG_TO_RAD * 30.0f;
-  if (fabsf(tilt) > MAX_TILT) {
-    return;
+  // 3. Validar confiabilidad de la medición
+  if (effective_cos < 0.1f) return;
+
+  // 4. Predicción y error (pared derecha: Y_drone > S_wall)
+  const float predicted = (this->S[KC_STATE_Y] - this->S[KC_STATE_S]) / effective_cos;
+  const float error = tof->distance - predicted;
+
+  // 5. Detección de outliers (reset de S)
+  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
+    this->P[KC_STATE_S][KC_STATE_S] = variance_after_detection;
+    this->S[KC_STATE_S] = this->S[KC_STATE_Y] - tof->distance * effective_cos;
+    return;  // Saltar actualización esta iteración
   }
 
-  // 4) Descontar mitad de FOV y saturar a ≥ 0
-  const float HALF_FOV = DEG_TO_RAD * (15.0f/2.0f);
-  float angle = fabsf(tilt) - HALF_FOV;
-  if (angle < 0.0f) angle = 0.0f;
-  float cosA = cosf(angle);
+  // 6. Jacobiano
+  h[KC_STATE_Y] =  1.0f / effective_cos;
+  h[KC_STATE_S] = -1.0f / effective_cos;
 
-  // 5) Predicción y error (Y–S)
-  float predicted = (this->S[KC_STATE_Y] - this->S[KC_STATE_S]) / cosA;
-  float measured  = tof->distance;
-  float error     = measured - predicted;
-
-  // 6) Detección de outliers
-  if (use_detection) {
-    float thr = detection_factor * tof->stdDev;
-    if (error*error > thr*thr) {
-      this->P[KC_STATE_S][KC_STATE_S] = variance_after_detection;
-      // reajuste rápido de S
-      this->S[KC_STATE_S] = this->S[KC_STATE_Y] - measured * cosA;
-      error = 0.0f;
-    }
-  }
-
-  // 7) Jacobiano coherente
-  h[KC_STATE_Y] =  1.0f / cosA;
-  h[KC_STATE_S] = -1.0f / cosA;
-
-  // 8) Scalar update
+  // 7. Actualización
   kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
 }
 
 void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
-  // 1) Preparar jacobiano
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 2) Sacar el tilt real desde R[2][1]
-  float r21  = this->R[2][1];
-  float tilt = asinf(r21);
+  // 1. Obtener componente vertical del eje Y
+  const float r21 = this->R[2][1];
+  const float sin_alpha = fabsf(r21);
+  
+  // 2. Calcular coseno efectivo
+  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
+  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
+  const float min_cos = cosf(HALF_FOV);
+  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
 
-  // 3) Filtrar si hay demasiado tilt
-  const float MAX_TILT = DEG_TO_RAD * 30.0f;
-  if (fabsf(tilt) > MAX_TILT) {
+  // 3. Validar confiabilidad
+  if (effective_cos < 0.1f) return;
+
+  // 4. Predicción y error (pared izquierda: T_wall > Y_drone)
+  const float predicted = (this->S[KC_STATE_T] - this->S[KC_STATE_Y]) / effective_cos;
+  const float error = tof->distance - predicted;
+
+  // 5. Detección de outliers (reset de T)
+  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
+    this->P[KC_STATE_T][KC_STATE_T] = variance_after_detection;
+    this->S[KC_STATE_T] = this->S[KC_STATE_Y] + tof->distance * effective_cos;
     return;
   }
 
-  // 4) Ajuste de FOV
-  const float HALF_FOV = DEG_TO_RAD * (15.0f/2.0f);
-  float angle = fabsf(tilt) - HALF_FOV;
-  if (angle < 0.0f) angle = 0.0f;
-  float cosA = cosf(angle);
+  // 6. Jacobiano
+  h[KC_STATE_Y] = -1.0f / effective_cos;
+  h[KC_STATE_T] =  1.0f / effective_cos;
 
-  // 5) Predicción y error (T–Y)
-  float predicted = (this->S[KC_STATE_T] - this->S[KC_STATE_Y]) / cosA;
-  float measured  = tof->distance;
-  float error     = measured - predicted;
-
-  // 6) Detección de outliers
-  if (use_detection) {
-    float thr = detection_factor * tof->stdDev;
-    if (error*error > thr*thr) {
-      this->P[KC_STATE_T][KC_STATE_T] = variance_after_detection;
-      // reajuste rápido de T
-      this->S[KC_STATE_T] = this->S[KC_STATE_Y] + measured * cosA;
-      error = 0.0f;
-    }
-  }
-
-  // 7) Jacobiano coherente
-  h[KC_STATE_Y] = -1.0f / cosA;
-  h[KC_STATE_T] =  1.0f / cosA;
-
-  // 8) Scalar update
+  // 7. Actualización
   kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
 }
-
 PARAM_GROUP_START(kalman)
 /**
  * @brief The error threshold in Tof measurements that cause a detection of step in F or R
