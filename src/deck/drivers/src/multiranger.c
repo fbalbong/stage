@@ -54,7 +54,7 @@ static uint16_t filterMask = 1 << VL53L1_RANGESTATUS_RANGE_VALID;
 #define MR_PIN_LEFT PCA95X4_P6
 #define MR_PIN_RIGHT PCA95X4_P2
 
-#define RANGE_UP_OUTLIER_LIMIT 5000 // the measured range is in [mm]
+#define RANGE_UP_OUTLIER_LIMIT 4000 // the measured range is in [mm]
 
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devFront;
 NO_DMA_CCM_SAFE_ZERO_INIT static VL53L1_Dev_t devBack;
