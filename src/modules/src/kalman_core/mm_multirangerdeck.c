@@ -198,16 +198,16 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
   }
 
   // 2. Aplicar filtro de mediana
-  float median_distance = medianFilterUpdate(&back_median, tof->distance);
+  float median_distance = medianFilterUpdate(&front_median, tof->distance);
   
   // 3. Aplicar filtro EMA a la mediana
-  if (!back_ema_initialized) {
-    back_ema = median_distance;
-    back_ema_initialized = true;
+  if (!front_ema_initialized) {
+    front_ema = median_distance;
+    front_ema_initialized = true;
   } else {
-    back_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * back_ema;
+    front_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * front_ema;
   }
-  float filtered_distance = back_ema;
+  float filtered_distance = front_ema;
 
   // 4. Calcular factor de distancia
   float distance_factor = 1.0f + distance_noise_factor * filtered_distance;
@@ -279,16 +279,16 @@ void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t
   }
 
   // 2. Aplicar filtro de mediana
-  float median_distance = medianFilterUpdate(&back_median, tof->distance);
+  float median_distance = medianFilterUpdate(&right_median, tof->distance);
   
   // 3. Aplicar filtro EMA a la mediana
-  if (!back_ema_initialized) {
-    back_ema = median_distance;
-    back_ema_initialized = true;
+  if (!right_ema_initialized) {
+    right_ema = median_distance;
+    right_ema_initialized = true;
   } else {
-    back_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * back_ema;
+    right_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * right_ema;
   }
-  float filtered_distance = back_ema;
+  float filtered_distance = right_ema;
 
   // 4. Calcular factor de distancia
   float distance_factor = 1.0f + distance_noise_factor * filtered_distance;
@@ -360,16 +360,16 @@ void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t 
   }
 
   // 2. Aplicar filtro de mediana
-  float median_distance = medianFilterUpdate(&back_median, tof->distance);
+  float median_distance = medianFilterUpdate(&left_median, tof->distance);
   
   // 3. Aplicar filtro EMA a la mediana
-  if (!back_ema_initialized) {
-    back_ema = median_distance;
-    back_ema_initialized = true;
+  if (!left_ema_initialized) {
+    left_ema = median_distance;
+    left_ema_initialized = true;
   } else {
-    back_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * back_ema;
+    left_ema = ema_alpha * median_distance + (1.0f - ema_alpha) * left_ema;
   }
-  float filtered_distance = back_ema;
+  float filtered_distance = left_ema;
 
   // 4. Calcular factor de distancia
   float distance_factor = 1.0f + distance_noise_factor * filtered_distance;
