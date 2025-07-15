@@ -41,8 +41,8 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[2][2] -> 0)
-  if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
-    float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
+  if (fabs(this->R[2][0]) > 0.1 && this->R[2][0] > 0){
+    float angle = fabsf(acosf(this->R[2][0])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
@@ -89,8 +89,8 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[0][0] -> 0)
-  if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
-    float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
+  if (fabs(this->R[2][0]) > 0.1 && this->R[2][0] > 0){
+    float angle = fabsf(acosf(this->R[2][0])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
@@ -134,8 +134,8 @@ void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
-  if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
-    float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
+  if (fabs(this->R[2][1]) > 0.1 && this->R[2][1] > 0){
+    float angle = fabsf(acosf(this->R[2][1])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
@@ -179,8 +179,8 @@ void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t 
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
-  if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
-    float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
+  if (fabs(this->R[2][1]) > 0.1 && this->R[2][1] > 0){
+    float angle = fabsf(acosf(this->R[2][1])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
