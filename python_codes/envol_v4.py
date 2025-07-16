@@ -53,12 +53,12 @@ def kalman_extra_callback(timestamp, data, logconf):
 
 def kalman_extra_callback_2(timestamp, data, logconf):
     # Añade los valores si existen, sino NaN
-    kalman_data['F'].append(data.get('kalman.stateB', np.nan))
-    kalman_data['R'].append(data.get('kalman.stateC', np.nan))
-    kalman_data['Z'].append(data.get('kalman.stateX', np.nan))
-    kalman_data['F'].append(data.get('kalman.stateS', np.nan))
-    kalman_data['R'].append(data.get('kalman.stateT', np.nan))
-    kalman_data['Z'].append(data.get('kalman.stateY', np.nan))
+    kalman_data['B'].append(data.get('kalman.stateB', np.nan))
+    kalman_data['C'].append(data.get('kalman.stateC', np.nan))
+    kalman_data['X'].append(data.get('kalman.stateX', np.nan))
+    kalman_data['S'].append(data.get('kalman.stateS', np.nan))
+    kalman_data['T'].append(data.get('kalman.stateT', np.nan))
+    kalman_data['Y'].append(data.get('kalman.stateY', np.nan))
 
 def lighthouse_callback(timestamp, data, logconf):
     lighthouse_data['x'].append(data['lighthouse.x'])
@@ -155,7 +155,7 @@ if __name__ == '__main__':
         use_useFAndR = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_useFAndR = int(use_useFAndR)
 
-    use_useBAndCAndSAndT = input("Vous voulez utiliser kalman.useFAndR? (1 = Oui, 0 = Non): ")
+    use_useBAndCAndSAndT = input("Vous voulez utiliser kalman.useBAndCAndSAndT? (1 = Oui, 0 = Non): ")
     while use_useBAndCAndSAndT not in ['0', '1']:
         use_useBAndCAndSAndT = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_useBAndCAndSAndT = int(use_useBAndCAndSAndT)
@@ -275,11 +275,14 @@ if __name__ == '__main__':
             #(-0.5, 0, 0, 2)
             (0, 0, 0, 1),
             (0, 0, 0.5, 3),
-            (1.5, 0, 0.5, 4),
-            (1.5, 0, 1, 4),
-            (0, 0, 1, 4),
-            (-0.5, 0, 1, 4),
-            (-0.5, 0, 0, 2)
+            (1, 0, 0.5, 4),
+            (1, 1, 0.5, 4),
+            (2, 1, 0.5, 4),
+            (2, -1, 0.5, 4),
+            (1, -1, 0.5, 4),
+            (1, 0, 0.5, 4),
+            (0, 0, 0.5, 2),
+            (0, 0, 0, 2)
         ]
 
         for i in range(len(trajectory) - 1):
@@ -291,6 +294,11 @@ if __name__ == '__main__':
         if 'logconf_kf_extra' in locals():
             try:
                 logconf_kf_extra.stop()
+            except Exception:
+                pass
+        if 'logconf_kf_extra_2' in locals():
+            try:
+                logconf_kf_extra_2.stop()
             except Exception:
                 pass
         logconf_lh.stop()
