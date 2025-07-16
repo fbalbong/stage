@@ -129,7 +129,7 @@ static bool robustTdoa = false;
 static bool useFAndR = true;
 
 // Nonzero to take advantage of the extended state (B, C, S, T) to get a better estimate of X and Y
-static bool useBAndCAndSAndT = true;
+static bool useBAndCAndSAndT = false;
 
 /**
  * Quadrocopter State
