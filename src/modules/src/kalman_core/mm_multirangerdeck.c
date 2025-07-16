@@ -28,159 +28,201 @@
 
 // Parameters for tuning the detection for f and r estimation in the Tof update.
 // Factor multipled with the standard deviation of the measurement and compared to the prediction error (This is an int because of problems with param, if it is solved then it should probably be canged to a float) 
-static int detection_factor = 15;
+static int detection_factor = 10;
 // The value the variance of f or r is set to when a detection happenes. It can probably be tuned to be smaller, but there it does not really seem to matter as long as it is "large enough"
-static float variance_after_detection = 35; 
+static float variance_after_detection = 50; 
 // Flag for turning the detection on and off. Without detection f and r tend to not change, causing the same problems as when not using them at all. There could be some way to get it to work without detection, but it is not implemented.
 static bool use_detection = true;
 
 void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
+  // Updates the filter with a measured distance in the zb direction using the
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 1. Obtener componentes de inclinación vertical
-  const float r20 = this->R[2][0];
-  const float sin_alpha = fabsf(r20);
-  
-  // 2. Calcular coseno efectivo (con límite por FOV)
-  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
-  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
-  const float min_cos = cosf(HALF_FOV);
-  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
+  // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[2][2] -> 0)
+  /*if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
+    float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
+    if (angle < 0.0f) {
+      angle = 0.0f;
+    }
+  */
+    // float predictedDistance = (this->S[KC_STATE_X]-this->S[KC_STATE_B]) / cosf(angle);
+    float predictedDistance = (this->S[KC_STATE_X]-this->S[KC_STATE_B]);
+    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
+    float measuredDistance = tof->distance; // [m]
 
-  // 3. Validar confiabilidad de la medición
-  if (effective_cos < 0.1f) return;
+    float error = measuredDistance-predictedDistance;
 
-  // 4. Predicción y error (pared trasera: X_drone > B_wall)
-  const float predicted = (this->S[KC_STATE_X] - this->S[KC_STATE_B]) / effective_cos;
-  const float error = tof->distance - predicted;
 
-  // 5. Detección de outliers (reset de B)
-  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
-    this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
-    this->S[KC_STATE_B] = this->S[KC_STATE_X] - tof->distance * effective_cos;
-    return;  // Saltar actualización esta iteración
-  }
+    if (use_detection){ 
+      float threshold = detection_factor*(tof->stdDev);
+      // If the error is very large it probably means that S[KC_STATE_F] needs to change
+      if(error*error > threshold*threshold){
+        // Give a best first guess of the new floor height and set the variance high
+        this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
+        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
+        //this->S[KC_STATE_B] = this->S[KC_STATE_X] - measuredDistance*cosf(angle);
+        this->S[KC_STATE_B] = this->S[KC_STATE_X] - measuredDistance;
 
-  // 6. Jacobiano
-  h[KC_STATE_X] =  1.0f / effective_cos;
-  h[KC_STATE_B] = -1.0f / effective_cos;
+        error = 0.0f;
+      }
+    }
 
-  // 7. Actualización
-  kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+    //Measurement equation
+    //
+    // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
+    //h[KC_STATE_Z] = 1 / this->R[2][2];
+    //h[KC_STATE_X] = 1 / cosf(angle);
+    h[KC_STATE_X] = 1;
+
+
+    //h[KC_STATE_F] = -1 / this->R[2][2];
+    //h[KC_STATE_B] = -1 / cosf(angle);
+    h[KC_STATE_B] = -1;
+
+
+
+    // Scalar update
+    kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+  //}
 }
 
 void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
+  // Updates the filter with a measured distance in the zb direction using the
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 1. Obtener componentes de inclinación vertical
-  const float r20 = this->R[2][0];
-  const float sin_alpha = fabsf(r20);
-  
-  // 2. Calcular coseno efectivo
-  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
-  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
-  const float min_cos = cosf(HALF_FOV);
-  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
+  // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[0][0] -> 0)
+  /*if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
+    float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
+    if (angle < 0.0f) {
+      angle = 0.0f;
+    }
+    */
+    float predictedDistance = (this->S[KC_STATE_C]-this->S[KC_STATE_X]);
+    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
+    float measuredDistance = tof->distance; // [m]
 
-  // 3. Validar confiabilidad
-  if (effective_cos < 0.1f) return;
+    float error = measuredDistance-predictedDistance;
 
-  // 4. Predicción y error (pared frontal: C_wall > X_drone)
-  const float predicted = (this->S[KC_STATE_C] - this->S[KC_STATE_X]) / effective_cos;
-  const float error = tof->distance - predicted;
+    if (use_detection){ 
+      float threshold = detection_factor*(tof->stdDev);
+      // If the error is very large it probably means that S[KC_STATE_F] needs to change
+      if(error*error > threshold*threshold){
+        // Give a best first guess of the new floor height and set the variance high
+        this->P[KC_STATE_C][KC_STATE_C] = variance_after_detection;
+        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
+        this->S[KC_STATE_C] = this->S[KC_STATE_X] + measuredDistance;
 
-  // 5. Detección de outliers (reset de C)
-  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
-    this->P[KC_STATE_C][KC_STATE_C] = variance_after_detection;
-    this->S[KC_STATE_C] = this->S[KC_STATE_X] + tof->distance * effective_cos;
-    return;
-  }
+        error = 0.0f;
+      }
+    }
+    //Measurement equation
+    //
+    // h = (r - z)/((R*z_b)\dot z_b) = z/cos(alpha)
+    //h[KC_STATE_Z] = -1 / this->R[2][2];
+    h[KC_STATE_X] = -1;
 
-  // 6. Jacobiano
-  h[KC_STATE_X] = -1.0f / effective_cos;
-  h[KC_STATE_C] =  1.0f / effective_cos;
+    //h[KC_STATE_R] = 1 / this->R[2][2];
+    h[KC_STATE_C] = 1;
 
-  // 7. Actualización
-  kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+    // Scalar update
+    kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+  //}
 }
 
 void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
+  // Updates the filter with a measured distance in the zb direction using the
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 1. Obtener componente vertical del eje Y
-  const float r21 = this->R[2][1];
-  const float sin_alpha = fabsf(r21);
-  
-  // 2. Calcular coseno efectivo (con límite por FOV)
-  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
-  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
-  const float min_cos = cosf(HALF_FOV);
-  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
+  // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
+  /*if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
+    float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
+    if (angle < 0.0f) {
+      angle = 0.0f;
+    }
+    */
+    float predictedDistance = (this->S[KC_STATE_Y]-this->S[KC_STATE_S]);
+    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
+    float measuredDistance = tof->distance; // [m]
 
-  // 3. Validar confiabilidad de la medición
-  if (effective_cos < 0.1f) return;
+    float error = measuredDistance-predictedDistance;
 
-  // 4. Predicción y error (pared derecha: Y_drone > S_wall)
-  const float predicted = (this->S[KC_STATE_Y] - this->S[KC_STATE_S]) / effective_cos;
-  const float error = tof->distance - predicted;
+    if (use_detection){ 
+      float threshold = detection_factor*(tof->stdDev);
+      // If the error is very large it probably means that S[KC_STATE_F] needs to change
+      if(error*error > threshold*threshold){
+        // Give a best first guess of the new floor height and set the variance high
+        this->P[KC_STATE_S][KC_STATE_S] = variance_after_detection;
+        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
+        this->S[KC_STATE_S] = this->S[KC_STATE_Y] - measuredDistance;
 
-  // 5. Detección de outliers (reset de S)
-  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
-    this->P[KC_STATE_S][KC_STATE_S] = variance_after_detection;
-    this->S[KC_STATE_S] = this->S[KC_STATE_Y] - tof->distance * effective_cos;
-    return;  // Saltar actualización esta iteración
-  }
+        error = 0.0f;
+      }
+    }
 
-  // 6. Jacobiano
-  h[KC_STATE_Y] =  1.0f / effective_cos;
-  h[KC_STATE_S] = -1.0f / effective_cos;
+    //Measurement equation
+    //
+    // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
+    //h[KC_STATE_Z] = 1 / this->R[2][2];
+    h[KC_STATE_Y] = 1;
 
-  // 7. Actualización
-  kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+    //h[KC_STATE_F] = -1 / this->R[2][2];
+    h[KC_STATE_S] = -1;
+    // Scalar update
+    kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+  //}
 }
 
 void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
+  // Updates the filter with a measured distance in the zb direction using the
   float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
-  // 1. Obtener componente vertical del eje Y
-  const float r21 = this->R[2][1];
-  const float sin_alpha = fabsf(r21);
-  
-  // 2. Calcular coseno efectivo
-  const float HALF_FOV = DEG_TO_RAD * (15.0f / 2.0f);
-  const float base_cos = sqrtf(1 - sin_alpha * sin_alpha);
-  const float min_cos = cosf(HALF_FOV);
-  const float effective_cos = (base_cos > min_cos) ? base_cos : min_cos;
+  // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
+  /*if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
+    float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
+    if (angle < 0.0f) {
+      angle = 0.0f;
+    }
+    */
+    float predictedDistance = (this->S[KC_STATE_T]-this->S[KC_STATE_Y]);
+    // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
+    float measuredDistance = tof->distance; // [m]
 
-  // 3. Validar confiabilidad
-  if (effective_cos < 0.1f) return;
+    float error = measuredDistance-predictedDistance;
 
-  // 4. Predicción y error (pared izquierda: T_wall > Y_drone)
-  const float predicted = (this->S[KC_STATE_T] - this->S[KC_STATE_Y]) / effective_cos;
-  const float error = tof->distance - predicted;
+    if (use_detection){ 
+      float threshold = detection_factor*(tof->stdDev);
+      // If the error is very large it probably means that S[KC_STATE_F] needs to change
+      if(error*error > threshold*threshold){
+        // Give a best first guess of the new floor height and set the variance high
+        this->P[KC_STATE_T][KC_STATE_T] = variance_after_detection;
+        //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
+        this->S[KC_STATE_T] = this->S[KC_STATE_Y] + measuredDistance;
 
-  // 5. Detección de outliers (reset de T)
-  if (use_detection && fabsf(error) > detection_factor * tof->stdDev) {
-    this->P[KC_STATE_T][KC_STATE_T] = variance_after_detection;
-    this->S[KC_STATE_T] = this->S[KC_STATE_Y] + tof->distance * effective_cos;
-    return;
-  }
+        error = 0.0f;
+      }
+    }
 
-  // 6. Jacobiano
-  h[KC_STATE_Y] = -1.0f / effective_cos;
-  h[KC_STATE_T] =  1.0f / effective_cos;
+    //Measurement equation
+    //
+    // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
+    //h[KC_STATE_Z] = 1 / this->R[2][2];
+    h[KC_STATE_Y] = -1;
 
-  // 7. Actualización
-  kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+    //h[KC_STATE_F] = -1 / this->R[2][2];
+    h[KC_STATE_T] = 1;
+    // Scalar update
+    kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
+  //}
 }
+
 PARAM_GROUP_START(kalman)
 /**
  * @brief The error threshold in Tof measurements that cause a detection of step in F or R
