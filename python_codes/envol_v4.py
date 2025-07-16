@@ -18,6 +18,8 @@ kalman_data = {
     'time': [], 'x': [], 'y': [], 'z': [],
     'roll': [], 'pitch': [], 'yaw': [],
     'F' : [],  'R' : [], 'Z' : [],
+    'B' : [],  'C' : [], 'X' : [],
+    'S' : [],  'T' : [], 'Y' : []
 }
 
 lighthouse_data = {'x': [], 'y': [], 'z': []}
@@ -48,6 +50,15 @@ def kalman_extra_callback(timestamp, data, logconf):
     kalman_data['F'].append(data.get('kalman.stateF', np.nan))
     kalman_data['R'].append(data.get('kalman.stateR', np.nan))
     kalman_data['Z'].append(data.get('kalman.stateZ', np.nan))
+
+def kalman_extra_callback_2(timestamp, data, logconf):
+    # Añade los valores si existen, sino NaN
+    kalman_data['F'].append(data.get('kalman.stateB', np.nan))
+    kalman_data['R'].append(data.get('kalman.stateC', np.nan))
+    kalman_data['Z'].append(data.get('kalman.stateX', np.nan))
+    kalman_data['F'].append(data.get('kalman.stateS', np.nan))
+    kalman_data['R'].append(data.get('kalman.stateT', np.nan))
+    kalman_data['Z'].append(data.get('kalman.stateY', np.nan))
 
 def lighthouse_callback(timestamp, data, logconf):
     lighthouse_data['x'].append(data['lighthouse.x'])
@@ -128,28 +139,29 @@ def check_decks_attached(cf):
 
 # === MAIN ===
 if __name__ == '__main__':
-    """   use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
+
+    use_correction = input("Vous voulez utiliser lighthouse.useCorrection? (1 = Oui, 0 = Non): ")
     while use_correction not in ['0', '1']:
         use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_correction = int(use_correction)
-    """
+    
     lh_method = input("¿Quel method de lighthouse vous voulez utiliser? (0 = Crossing Beams, 1 = Sweep Angle): ")
     while lh_method not in ['0', '1']:
         lh_method = input("Entrée non validée. Écrivez 0 (Crossing Beams) o 1 (Sweep Angle): ")
     lh_method = int(lh_method)
 
-    use_correction = input("Vous voulez utiliser kalman.useFAndR? (1 = Oui, 0 = Non): ")
-    while use_correction not in ['0', '1']:
-        use_correction = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
-    use_correction = int(use_correction)
+    use_useFAndR = input("Vous voulez utiliser kalman.useFAndR? (1 = Oui, 0 = Non): ")
+    while use_useFAndR not in ['0', '1']:
+        use_useFAndR = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
+    use_useFAndR = int(use_useFAndR)
 
     cflib.crtp.init_drivers()
     arm_dron()
 
     with SyncCrazyflie(uri, cf=Crazyflie(rw_cache='./cache')) as scf:
         scf.cf.param.set_value('stabilizer.estimator', '2')
-        #scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
-        scf.cf.param.set_value('kalman.useFAndR', str(use_correction))
+        scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
+        scf.cf.param.set_value('kalman.useFAndR', str(use_useFAndR))
         scf.cf.param.set_value('lighthouse.method', str(lh_method))
         reset_estimator(scf.cf)
 
@@ -188,6 +200,18 @@ if __name__ == '__main__':
             scf.cf.log.add_config(logconf_kf_extra)
             logconf_kf_extra.data_received_cb.add_callback(kalman_extra_callback)
             logconf_kf_extra.start()
+        
+        # Kalman extra 2: SOLO B/C/X/S/T/Y (intenta añadirlas y arranca si alguna existe)
+        logconf_kf_extra_2 = LogConfig(name='KalmanB', period_in_ms=20)
+        for var in ['kalman.stateB', 'kalman.stateC', 'kalman.stateX', 'kalman.stateS', 'kalman.stateT', 'kalman.stateY']:
+            try:
+                logconf_kf_extra_2.add_variable(var, 'float')
+            except Exception:
+                pass
+        if len(logconf_kf_extra_2.variables) > 0:
+            scf.cf.log.add_config(logconf_kf_extra_2)
+            logconf_kf_extra_2.data_received_cb.add_callback(kalman_extra_callback_2)
+            logconf_kf_extra_2.start()
         
         # Lighthouse
         logconf_lh = LogConfig(name='Lighthouse', period_in_ms=20)
@@ -344,6 +368,12 @@ df = pd.DataFrame({
     'F': kalman_data['F'],
     'R': kalman_data['R'],
     'Z': kalman_data['Z'],
+    'B': kalman_data['B'],
+    'C': kalman_data['C'],
+    'X': kalman_data['X'],
+    'S': kalman_data['S'],
+    'T': kalman_data['T'],
+    'Y': kalman_data['Y'],
     'motor.m1': motor_data['m1'],
     'motor.m2': motor_data['m2'],
     'motor.m3': motor_data['m3'],
