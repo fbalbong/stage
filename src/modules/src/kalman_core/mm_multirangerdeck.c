@@ -35,8 +35,8 @@ static float variance_after_detection = 50;
 static bool use_detection = true;
 
 // Parámetros comunes
-#define MAX_TILT_DEG     30.0f
-#define HALF_FOV_DEG     (15.0f/2.0f)
+#define MAX_TILT_DEG 30.0f
+#define HALF_FOV_DEG (15.0f/2.0f)
 #define MAX_TILT_RAD     (DEG_TO_RAD * MAX_TILT_DEG)
 #define HALF_FOV_RAD     (DEG_TO_RAD * HALF_FOV_DEG)
 
@@ -64,8 +64,8 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
   // 4) Medición y “hot init” de B
   float measured = tof->distance;
   if (!this->stateBInitialized) {
-    this->S[KC_STATE_B]          = this->S[KC_STATE_X] - measured * cosA;
-    this->stateBInitialized      = true;
+    this->S[KC_STATE_B] = this->S[KC_STATE_X] - measured * cosA;
+    this->stateBInitialized = true;
   }
 
   // 5) Predicción y error
@@ -77,7 +77,7 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
     float thr = detection_factor * tof->stdDev;
     if (error*error > thr*thr) {
       this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
-      this->S[KC_STATE_B]             = this->S[KC_STATE_X] - measured * cosA;
+      this->S[KC_STATE_B] = this->S[KC_STATE_X] - measured * cosA;
       error = 0.0f;
     }
   }
@@ -92,7 +92,7 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
 
 void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {
-  float h[KC_STATE_DIM] = {0};
+float h[KC_STATE_DIM] = {0};
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // 1) Sacar tilt real del eje X_body
@@ -139,7 +139,6 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
   // 8) Actualización
   kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
 }
-
 
 void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t *tof)
 {

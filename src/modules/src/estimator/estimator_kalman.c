@@ -126,7 +126,7 @@ static bool robustTwr = false;
 static bool robustTdoa = false;
 
 // Nonzero to take advantage of the extended state (F and R) to get a better estimate of Z
-static bool useFAndR = true;
+static bool useFAndR = false;
 
 // Nonzero to take advantage of the extended state (B, C, S, T) to get a better estimate of X and Y
 static bool useBAndCAndSAndT = false;
