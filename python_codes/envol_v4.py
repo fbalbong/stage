@@ -155,6 +155,11 @@ if __name__ == '__main__':
         use_useFAndR = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
     use_useFAndR = int(use_useFAndR)
 
+    use_useBAndCAndSAndT = input("Vous voulez utiliser kalman.useFAndR? (1 = Oui, 0 = Non): ")
+    while use_useBAndCAndSAndT not in ['0', '1']:
+        use_useBAndCAndSAndT = input("Entrée non validée. Écrivez 1 (Oui) o 0 (Non): ")
+    use_useBAndCAndSAndT = int(use_useBAndCAndSAndT)
+
     cflib.crtp.init_drivers()
     arm_dron()
 
@@ -162,6 +167,7 @@ if __name__ == '__main__':
         scf.cf.param.set_value('stabilizer.estimator', '2')
         scf.cf.param.set_value('lighthouse.useCorrection', str(use_correction))
         scf.cf.param.set_value('kalman.useFAndR', str(use_useFAndR))
+        scf.cf.param.set_value('kalman.useBAndCAndSAndT', str(use_useBAndCAndSAndT))
         scf.cf.param.set_value('lighthouse.method', str(lh_method))
         reset_estimator(scf.cf)
 
