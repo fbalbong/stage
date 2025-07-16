@@ -41,14 +41,13 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[2][2] -> 0)
-  /*if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
+  if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
     float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-  */
-    // float predictedDistance = (this->S[KC_STATE_X]-this->S[KC_STATE_B]) / cosf(angle);
-    float predictedDistance = (this->S[KC_STATE_X]-this->S[KC_STATE_B]);
+    
+    float predictedDistance = (this->S[KC_STATE_X]-this->S[KC_STATE_B]) / cosf(angle);
     // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
@@ -62,8 +61,7 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
         // Give a best first guess of the new floor height and set the variance high
         this->P[KC_STATE_B][KC_STATE_B] = variance_after_detection;
         //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
-        //this->S[KC_STATE_B] = this->S[KC_STATE_X] - measuredDistance*cosf(angle);
-        this->S[KC_STATE_B] = this->S[KC_STATE_X] - measuredDistance;
+        this->S[KC_STATE_B] = this->S[KC_STATE_X] - measuredDistance*cosf(angle);
 
         error = 0.0f;
       }
@@ -73,19 +71,15 @@ void kalmanCoreUpdateWithBackTofUsingB(kalmanCoreData_t* this, tofMeasurement_t 
     //
     // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
     //h[KC_STATE_Z] = 1 / this->R[2][2];
-    //h[KC_STATE_X] = 1 / cosf(angle);
-    h[KC_STATE_X] = 1;
-
+    h[KC_STATE_X] = 1 / cosf(angle);
 
     //h[KC_STATE_F] = -1 / this->R[2][2];
-    //h[KC_STATE_B] = -1 / cosf(angle);
-    h[KC_STATE_B] = -1;
-
+    h[KC_STATE_B] = -1 / cosf(angle);
 
 
     // Scalar update
     kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
-  //}
+  }
 }
 
 void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t *tof)
@@ -95,13 +89,13 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[0][0] -> 0)
-  /*if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
+  if (fabs(this->R[0][0]) > 0.1 && this->R[0][0] > 0){
     float angle = fabsf(acosf(this->R[0][0])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-    */
-    float predictedDistance = (this->S[KC_STATE_C]-this->S[KC_STATE_X]);
+    
+    float predictedDistance = (this->S[KC_STATE_C]-this->S[KC_STATE_X]) / cosf(angle);
     // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
@@ -114,7 +108,7 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
         // Give a best first guess of the new floor height and set the variance high
         this->P[KC_STATE_C][KC_STATE_C] = variance_after_detection;
         //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
-        this->S[KC_STATE_C] = this->S[KC_STATE_X] + measuredDistance;
+        this->S[KC_STATE_C] = this->S[KC_STATE_X] + measuredDistance*cosf(angle);
 
         error = 0.0f;
       }
@@ -123,14 +117,14 @@ void kalmanCoreUpdateWithFrontTofUsingC(kalmanCoreData_t* this, tofMeasurement_t
     //
     // h = (r - z)/((R*z_b)\dot z_b) = z/cos(alpha)
     //h[KC_STATE_Z] = -1 / this->R[2][2];
-    h[KC_STATE_X] = -1;
+    h[KC_STATE_X] = -1 / cosf(angle);
 
     //h[KC_STATE_R] = 1 / this->R[2][2];
-    h[KC_STATE_C] = 1;
+    h[KC_STATE_C] = 1 / cosf(angle);
 
     // Scalar update
     kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
-  //}
+  }
 }
 
 void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t *tof)
@@ -140,13 +134,13 @@ void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
-  /*if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
+  if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
     float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-    */
-    float predictedDistance = (this->S[KC_STATE_Y]-this->S[KC_STATE_S]);
+    
+    float predictedDistance = (this->S[KC_STATE_Y]-this->S[KC_STATE_S]) / cosf(angle);
     // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
@@ -159,7 +153,7 @@ void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t
         // Give a best first guess of the new floor height and set the variance high
         this->P[KC_STATE_S][KC_STATE_S] = variance_after_detection;
         //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
-        this->S[KC_STATE_S] = this->S[KC_STATE_Y] - measuredDistance;
+        this->S[KC_STATE_S] = this->S[KC_STATE_Y] - measuredDistance*cosf(angle);
 
         error = 0.0f;
       }
@@ -169,13 +163,13 @@ void kalmanCoreUpdateWithRightTofUsingS(kalmanCoreData_t* this, tofMeasurement_t
     //
     // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
     //h[KC_STATE_Z] = 1 / this->R[2][2];
-    h[KC_STATE_Y] = 1;
+    h[KC_STATE_Y] = 1 / cosf(angle);
 
     //h[KC_STATE_F] = -1 / this->R[2][2];
-    h[KC_STATE_S] = -1;
+    h[KC_STATE_S] = -1 / cosf(angle);
     // Scalar update
     kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
-  //}
+  }
 }
 
 void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t *tof)
@@ -185,13 +179,13 @@ void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t 
   arm_matrix_instance_f32 H = {1, KC_STATE_DIM, h};
 
   // Only update the filter if the measurement is reliable (\hat{h} -> infty when R[1][1] -> 0)
-  /*if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
+  if (fabs(this->R[1][1]) > 0.1 && this->R[1][1] > 0){
     float angle = fabsf(acosf(this->R[1][1])) - DEG_TO_RAD * (15.0f / 2.0f);
     if (angle < 0.0f) {
       angle = 0.0f;
     }
-    */
-    float predictedDistance = (this->S[KC_STATE_T]-this->S[KC_STATE_Y]);
+    
+    float predictedDistance = (this->S[KC_STATE_T]-this->S[KC_STATE_Y]) / cosf(angle);
     // float predictedDistance = (this->S[KC_STATE_Z]-this->S[KC_STATE_F]) / this->R[2][2];
     float measuredDistance = tof->distance; // [m]
 
@@ -204,7 +198,7 @@ void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t 
         // Give a best first guess of the new floor height and set the variance high
         this->P[KC_STATE_T][KC_STATE_T] = variance_after_detection;
         //this->S[KC_STATE_F] = this->S[KC_STATE_Z] - measuredDistance*this->R[2][2];
-        this->S[KC_STATE_T] = this->S[KC_STATE_Y] + measuredDistance;
+        this->S[KC_STATE_T] = this->S[KC_STATE_Y] + measuredDistance*cosf(angle);
 
         error = 0.0f;
       }
@@ -214,13 +208,13 @@ void kalmanCoreUpdateWithLeftTofUsingT(kalmanCoreData_t* this, tofMeasurement_t 
     //
     // h = (z - f)/((R*z_b)\dot z_b) = z/cos(alpha)
     //h[KC_STATE_Z] = 1 / this->R[2][2];
-    h[KC_STATE_Y] = -1;
+    h[KC_STATE_Y] = -1 / cosf(angle);
 
     //h[KC_STATE_F] = -1 / this->R[2][2];
-    h[KC_STATE_T] = 1;
+    h[KC_STATE_T] = 1 / cosf(angle);
     // Scalar update
     kalmanCoreScalarUpdate(this, &H, error, tof->stdDev);
-  //}
+  }
 }
 
 PARAM_GROUP_START(kalman)
