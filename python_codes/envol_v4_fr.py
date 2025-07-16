@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Script de journalisation des données de vol du Crazyflie
 Commentaires en français pour clarifier le rôle de chaque section.
